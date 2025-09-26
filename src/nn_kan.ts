@@ -45,7 +45,7 @@ export class LearnableFunction {
   private initializeControlPoints(): void {
     // Initialize with small random values
     for (let i = 0; i < this.gridPoints.length; i++) {
-      this.controlPoints.push((Math.random() - 0.5) * 0.1);
+      this.controlPoints.push((Math.random() - 0.5) * 0.3);
     }
   }
 
