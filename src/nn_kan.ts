@@ -27,13 +27,16 @@ export class LearnableFunction {
   gridSize: number;
   /** B-spline degree */
   degree: number;
+  /** Initial noise for control point initialization */
+  initNoise: number;
   /** Input range for normalization */
   inputRange: [number, number] = [-1, 1];
   
-  constructor(id: string, gridSize: number = 5, range: [number, number] = [-1, 1], degree: number = 3) {
+  constructor(id: string, gridSize: number = 5, range: [number, number] = [-1, 1], degree: number = 3, initNoise: number = 0.3) {
     this.id = id;
     this.gridSize = gridSize;
     this.degree = Math.min(degree, gridSize - 1); // Degree cannot exceed gridSize - 1
+    this.initNoise = initNoise;
     this.inputRange = range;
     this.initializeKnotVector();
     this.initializeControlPoints();
@@ -68,7 +71,7 @@ export class LearnableFunction {
     const numControlPoints = this.gridSize + 1;
     this.controlPoints = [];
     for (let i = 0; i < numControlPoints; i++) {
-      this.controlPoints.push((Math.random() - 0.5) * 0.3);
+      this.controlPoints.push((Math.random() - 0.5) * this.initNoise);
     }
   }
 
@@ -224,11 +227,11 @@ export class KANEdge {
   accGradients: number[] = [];
   numAccumulatedGrads: number = 0;
 
-  constructor(source: KANNode, dest: KANNode, gridSize: number = 5, degree: number = 3) {
+  constructor(source: KANNode, dest: KANNode, gridSize: number = 5, degree: number = 3, initNoise: number = 0.3) {
     this.id = source.id + "-" + dest.id;
     this.sourceNode = source;
     this.destNode = dest;
-    this.learnableFunction = new LearnableFunction(this.id, gridSize, [-1, 1], degree);
+    this.learnableFunction = new LearnableFunction(this.id, gridSize, [-1, 1], degree, initNoise);
     
     // Initialize accumulated gradients array
     const numControlPoints = gridSize + 1;
@@ -322,6 +325,7 @@ export function buildKANNetwork(
   inputIds: string[],
   gridSize: number = 5,
   degree: number = 3,
+  initNoise: number = 0.3,
   useBias: boolean = false
 ): KANNode[][] {
   const numLayers = networkShape.length;
@@ -351,7 +355,7 @@ export function buildKANNetwork(
     
     for (const destNode of currentLayer) {
       for (const sourceNode of prevLayer) {
-        const edge = new KANEdge(sourceNode, destNode, gridSize, degree);
+        const edge = new KANEdge(sourceNode, destNode, gridSize, degree, initNoise);
         sourceNode.outputEdges.push(edge);
         destNode.inputEdges.push(edge);
       }

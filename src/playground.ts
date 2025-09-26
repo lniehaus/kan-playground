@@ -90,6 +90,8 @@ let HIDABLE_CONTROLS = [
   ["Batch size", "batchSize"],
   ["# of hidden layers", "numHiddenLayers"],
   ["Grid size", "gridSize"],
+  ["Spline degree", "degree"],
+  ["Init noise", "initNoise"], 
 ];
 
 class Player {
@@ -336,33 +338,37 @@ function makeGUI() {
     state.serialize();
     userHasInteracted();
     parametersChanged = true;
+    // reset(); not needed, changes take effect immediately and can be used as manual learning rate scheduler
   });
   learningRate.property("value", state.learningRate);
 
-  let regularDropdown = d3.select("#regularizations").on("change",
-      function() {
-    state.regularization = regularizations[this.value];
+  let gridSize = d3.select("#gridSize").on("change", function() {
+    state.gridSize = +this.value;
+    state.serialize();
+    userHasInteracted();
     parametersChanged = true;
     reset();
   });
-  regularDropdown.property("value",
-      getKeyFromValue(regularizations, state.regularization));
+  gridSize.property("value", state.gridSize);
 
-  let regularRate = d3.select("#regularRate").on("change", function() {
-    state.regularizationRate = +this.value;
+  let degree = d3.select("#degree").on("change", function() {
+    state.degree = +this.value;
+    state.serialize();
+    userHasInteracted();
     parametersChanged = true;
     reset();
   });
-  regularRate.property("value", state.regularizationRate);
+  degree.property("value", state.degree);
 
-  let problem = d3.select("#problem").on("change", function() {
-    state.problem = problems[this.value];
-    generateData();
-    drawDatasetThumbnails();
+  // Add initNoise control
+  let initNoise = d3.select("#initNoise").on("change", function() {
+    state.initNoise = +this.value;
+    state.serialize();
+    userHasInteracted();
     parametersChanged = true;
     reset();
   });
-  problem.property("value", getKeyFromValue(problems, state.problem));
+  initNoise.property("value", state.initNoise);
 
   // Add scale to the gradient color map.
   let x = d3.scale.linear().domain([-1, 1]).range([0, 144]);
@@ -967,7 +973,8 @@ function reset(onStartup=false) {
   let numInputs = constructInput(0 , 0).length;
   let shape = [numInputs].concat(state.networkShape).concat([1]);
   
-  network = nn_kan.buildKANNetwork(shape, constructInputIds(), state.gridSize, 3, false);
+  // Updated to include initNoise parameter
+  network = nn_kan.buildKANNetwork(shape, constructInputIds(), state.gridSize, state.degree, state.initNoise, false);
   lossTrain = getLoss(network, trainData);
   lossTest = getLoss(network, testData);
   drawNetwork(network);

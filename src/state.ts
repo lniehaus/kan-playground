@@ -132,7 +132,9 @@ export class State {
     {name: "problem", type: Type.OBJECT, keyMap: problems},
     {name: "initZero", type: Type.BOOLEAN},
     {name: "hideText", type: Type.BOOLEAN},
-    {name: "gridSize", type: Type.NUMBER}, // Add KAN grid size parameter
+    {name: "gridSize", type: Type.NUMBER}, // KAN grid size parameter
+    {name: "degree", type: Type.NUMBER},   // KAN B-spline degree parameter
+    {name: "initNoise", type: Type.NUMBER}, // KAN initial control point noise parameter
   ];
 
   [key: string]: any;
@@ -154,6 +156,8 @@ export class State {
   hiddenLayerControls: any[] = [];
   networkShape: number[] = [4, 2];
   gridSize = 5; // KAN grid size for spline functions
+  degree = 3;   // KAN B-spline degree (1=linear, 3=cubic, etc.)
+  initNoise = 0.3; // KAN initial control point noise (0=zero init, higher=more random)
   x = true;
   y = true;
   xTimesY = false;
