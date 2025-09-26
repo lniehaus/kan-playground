@@ -14,6 +14,7 @@ limitations under the License.
 ==============================================================================*/
 
 import * as nn from "./nn";
+import * as nn_kan from "./nn_kan";
 import * as dataset from "./dataset";
 
 /** Suffix added to the state when storing if a control is hidden or not. */
@@ -130,7 +131,8 @@ export class State {
     {name: "tutorial", type: Type.STRING},
     {name: "problem", type: Type.OBJECT, keyMap: problems},
     {name: "initZero", type: Type.BOOLEAN},
-    {name: "hideText", type: Type.BOOLEAN}
+    {name: "hideText", type: Type.BOOLEAN},
+    {name: "gridSize", type: Type.NUMBER}, // Add KAN grid size parameter
   ];
 
   [key: string]: any;
@@ -151,6 +153,7 @@ export class State {
   numHiddenLayers = 1;
   hiddenLayerControls: any[] = [];
   networkShape: number[] = [4, 2];
+  gridSize = 5; // KAN grid size for spline functions
   x = true;
   y = true;
   xTimesY = false;

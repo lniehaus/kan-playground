@@ -14,6 +14,7 @@ limitations under the License.
 ==============================================================================*/
 
 import * as nn from "./nn";
+import * as nn_kan from "./nn_kan";
 import {HeatMap, reduceMatrix} from "./heatmap";
 import {
   State,
@@ -88,6 +89,7 @@ let HIDABLE_CONTROLS = [
   ["Noise level", "noise"],
   ["Batch size", "batchSize"],
   ["# of hidden layers", "numHiddenLayers"],
+  ["Grid size", "gridSize"],
 ];
 
 class Player {
@@ -153,7 +155,7 @@ state.getHiddenProps().forEach(prop => {
 let boundary: {[id: string]: number[][]} = {};
 let selectedNodeId: string = null;
 // Plot the heatmap.
-let xDomain: [number, number] = [-6, 6];
+let xDomain: [number, number] = [-1, 1];
 let heatMap =
     new HeatMap(300, DENSITY, xDomain, xDomain, d3.select("#heatmap"),
         {showAxes: true});
@@ -168,7 +170,7 @@ let colorScale = d3.scale.linear<string, number>()
 let iter = 0;
 let trainData: Example2D[] = [];
 let testData: Example2D[] = [];
-let network: nn.Node[][] = null;
+let network: nn_kan.KANNode[][] = null;
 let lossTrain = 0;
 let lossTest = 0;
 let player = new Player();
@@ -394,34 +396,36 @@ function makeGUI() {
   }
 }
 
-function updateBiasesUI(network: nn.Node[][]) {
-  nn.forEachNode(network, true, node => {
+function updateBiasesUI(network: nn_kan.KANNode[][]) {
+  nn_kan.forEachKANNode(network, true, node => {
     d3.select(`rect#bias-${node.id}`).style("fill", colorScale(node.bias));
   });
 }
 
-function updateWeightsUI(network: nn.Node[][], container) {
+function updateWeightsUI(network: nn_kan.KANNode[][], container) {
   for (let layerIdx = 1; layerIdx < network.length; layerIdx++) {
     let currentLayer = network[layerIdx];
     // Update all the nodes in this layer.
     for (let i = 0; i < currentLayer.length; i++) {
       let node = currentLayer[i];
-      for (let j = 0; j < node.inputLinks.length; j++) {
-        let link = node.inputLinks[j];
-        container.select(`#link${link.source.id}-${link.dest.id}`)
+      for (let j = 0; j < node.inputEdges.length; j++) {
+        let edge = node.inputEdges[j];
+        // Get average spline value for visualization
+        let avgWeight = edge.learnableFunction.controlPoints.reduce((a, b) => a + b, 0) / edge.learnableFunction.controlPoints.length;
+        container.select(`#link${edge.sourceNode.id}-${edge.destNode.id}`)
             .style({
               "stroke-dashoffset": -iter / 3,
-              "stroke-width": linkWidthScale(Math.abs(link.weight)),
-              "stroke": colorScale(link.weight)
+              "stroke-width": linkWidthScale(Math.abs(avgWeight)),
+              "stroke": colorScale(avgWeight)
             })
-            .datum(link);
+            .datum(edge);
       }
     }
   }
 }
 
 function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
-    container, node?: nn.Node) {
+    container, node?: nn_kan.KANNode) {
   let x = cx - RECT_SIZE / 2;
   let y = cy - RECT_SIZE / 2;
 
@@ -514,7 +518,7 @@ function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
       div.classed("hovered", false);
       nodeGroup.classed("hovered", false);
       updateDecisionBoundary(network, false);
-      heatMap.updateBackground(boundary[nn.getOutputNode(network).id],
+      heatMap.updateBackground(boundary[nn_kan.getKANOutputNode(network).id],
           state.discretize);
     });
   if (isInput) {
@@ -535,7 +539,7 @@ function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
 }
 
 // Draw network
-function drawNetwork(network: nn.Node[][]): void {
+function drawNetwork(network: nn_kan.KANNode[][]): void {
   let svg = d3.select("#svg");
   // Remove all svg elements.
   svg.select("g.core").remove();
@@ -605,19 +609,19 @@ function drawNetwork(network: nn.Node[][]): void {
         idWithCallout = node.id;
       }
 
-      // Draw links.
-      for (let j = 0; j < node.inputLinks.length; j++) {
-        let link = node.inputLinks[j];
-        let path: SVGPathElement = drawLink(link, node2coord, network,
-            container, j === 0, j, node.inputLinks.length).node() as any;
+      // Draw edges.
+      for (let j = 0; j < node.inputEdges.length; j++) {
+        let edge = node.inputEdges[j];
+        let path: SVGPathElement = drawLink(edge, node2coord, network,
+            container, j === 0, j, node.inputEdges.length).node() as any;
         // Show callout to weights.
         let prevLayer = network[layerIdx - 1];
         let lastNodePrevLayer = prevLayer[prevLayer.length - 1];
         if (targetIdWithCallout == null &&
             i === numNodes - 1 &&
-            link.source.id === lastNodePrevLayer.id &&
-            (link.source.id !== idWithCallout || numLayers <= 5) &&
-            link.dest.id !== idWithCallout &&
+            edge.sourceNode.id === lastNodePrevLayer.id &&
+            (edge.sourceNode.id !== idWithCallout || numLayers <= 5) &&
+            edge.destNode.id !== idWithCallout &&
             prevLayer.length >= numNodes) {
           let midPoint = path.getPointAtLength(path.getTotalLength() * 0.7);
           calloutWeights.style({
@@ -625,7 +629,7 @@ function drawNetwork(network: nn.Node[][]): void {
             top: `${midPoint.y + 5}px`,
             left: `${midPoint.x + 3}px`
           });
-          targetIdWithCallout = link.dest.id;
+          targetIdWithCallout = edge.destNode.id;
         }
       }
     }
@@ -636,11 +640,11 @@ function drawNetwork(network: nn.Node[][]): void {
   let node = network[numLayers - 1][0];
   let cy = nodeIndexScale(0) + RECT_SIZE / 2;
   node2coord[node.id] = {cx, cy};
-  // Draw links.
-  for (let i = 0; i < node.inputLinks.length; i++) {
-    let link = node.inputLinks[i];
-    drawLink(link, node2coord, network, container, i === 0, i,
-        node.inputLinks.length);
+  // Draw edges.
+  for (let i = 0; i < node.inputEdges.length; i++) {
+    let edge = node.inputEdges[i];
+    drawLink(edge, node2coord, network, container, i === 0, i,
+        node.inputEdges.length);
   }
   // Adjust the height of the svg.
   svg.attr("height", maxY);
@@ -702,7 +706,7 @@ function addPlusMinusControl(x: number, layerIdx: number) {
   );
 }
 
-function updateHoverCard(type: HoverType, nodeOrLink?: nn.Node | nn.Link,
+function updateHoverCard(type: HoverType, nodeOrEdge?: nn_kan.KANNode | nn_kan.KANEdge,
     coordinates?: [number, number]) {
   let hovercard = d3.select("#hovercard");
   if (type == null) {
@@ -717,23 +721,30 @@ function updateHoverCard(type: HoverType, nodeOrLink?: nn.Node | nn.Link,
     input.on("input", function() {
       if (this.value != null && this.value !== "") {
         if (type === HoverType.WEIGHT) {
-          (nodeOrLink as nn.Link).weight = +this.value;
+          // For KAN edges, we can't directly set a single weight
+          // Instead, set all control points to the same value
+          // ToDo: find a better solution than setting all coefs to the same value
+          let edge = nodeOrEdge as nn_kan.KANEdge;
+          let newValue = +this.value;
+          for (let i = 0; i < edge.learnableFunction.controlPoints.length; i++) {
+            edge.learnableFunction.controlPoints[i] = newValue;
+          }
         } else {
-          (nodeOrLink as nn.Node).bias = +this.value;
+          (nodeOrEdge as nn_kan.KANNode).bias = +this.value;
         }
         updateUI();
       }
     });
     input.on("keypress", () => {
       if ((d3.event as any).keyCode === 13) {
-        updateHoverCard(type, nodeOrLink, coordinates);
+        updateHoverCard(type, nodeOrEdge, coordinates);
       }
     });
     (input.node() as HTMLInputElement).focus();
   });
   let value = (type === HoverType.WEIGHT) ?
-    (nodeOrLink as nn.Link).weight :
-    (nodeOrLink as nn.Node).bias;
+    (nodeOrEdge as nn_kan.KANEdge).learnableFunction.controlPoints.reduce((a, b) => a + b, 0) / (nodeOrEdge as nn_kan.KANEdge).learnableFunction.controlPoints.length :
+    (nodeOrEdge as nn_kan.KANNode).bias;
   let name = (type === HoverType.WEIGHT) ? "Weight" : "Bias";
   hovercard.style({
     "left": `${coordinates[0] + 20}px`,
@@ -750,12 +761,12 @@ function updateHoverCard(type: HoverType, nodeOrLink?: nn.Node | nn.Link,
 }
 
 function drawLink(
-    input: nn.Link, node2coord: {[id: string]: {cx: number, cy: number}},
-    network: nn.Node[][], container,
+    edge: nn_kan.KANEdge, node2coord: {[id: string]: {cx: number, cy: number}},
+    network: nn_kan.KANNode[][], container,
     isFirst: boolean, index: number, length: number) {
   let line = container.insert("path", ":first-child");
-  let source = node2coord[input.source.id];
-  let dest = node2coord[input.dest.id];
+  let source = node2coord[edge.sourceNode.id];
+  let dest = node2coord[edge.destNode.id];
   let datum = {
     source: {
       y: source.cx + RECT_SIZE / 2 + 2,
@@ -770,7 +781,7 @@ function drawLink(
   line.attr({
     "marker-start": "url(#markerArrow)",
     class: "link",
-    id: "link" + input.source.id + "-" + input.dest.id,
+    id: "link" + edge.sourceNode.id + "-" + edge.destNode.id,
     d: diagonal(datum, 0)
   });
 
@@ -780,7 +791,7 @@ function drawLink(
     .attr("d", diagonal(datum, 0))
     .attr("class", "link-hover")
     .on("mouseenter", function() {
-      updateHoverCard(HoverType.WEIGHT, input, d3.mouse(this));
+      updateHoverCard(HoverType.WEIGHT, edge, d3.mouse(this));
     }).on("mouseleave", function() {
       updateHoverCard(null);
     });
@@ -788,15 +799,15 @@ function drawLink(
 }
 
 /**
- * Given a neural network, it asks the network for the output (prediction)
+ * Given a KAN network, it asks the network for the output (prediction)
  * of every node in the network using inputs sampled on a square grid.
  * It returns a map where each key is the node ID and the value is a square
  * matrix of the outputs of the network for each input in the grid respectively.
  */
-function updateDecisionBoundary(network: nn.Node[][], firstTime: boolean) {
+function updateDecisionBoundary(network: nn_kan.KANNode[][], firstTime: boolean) {
   if (firstTime) {
     boundary = {};
-    nn.forEachNode(network, true, node => {
+    nn_kan.forEachKANNode(network, true, node => {
       boundary[node.id] = new Array(DENSITY);
     });
     // Go through all predefined inputs.
@@ -810,7 +821,7 @@ function updateDecisionBoundary(network: nn.Node[][], firstTime: boolean) {
   let i = 0, j = 0;
   for (i = 0; i < DENSITY; i++) {
     if (firstTime) {
-      nn.forEachNode(network, true, node => {
+      nn_kan.forEachKANNode(network, true, node => {
         boundary[node.id][i] = new Array(DENSITY);
       });
       // Go through all predefined inputs.
@@ -823,8 +834,8 @@ function updateDecisionBoundary(network: nn.Node[][], firstTime: boolean) {
       let x = xScale(i);
       let y = yScale(j);
       let input = constructInput(x, y);
-      nn.forwardProp(network, input);
-      nn.forEachNode(network, true, node => {
+      nn_kan.kanForwardProp(network, input);
+      nn_kan.forEachKANNode(network, true, node => {
         boundary[node.id][i][j] = node.output;
       });
       if (firstTime) {
@@ -837,12 +848,12 @@ function updateDecisionBoundary(network: nn.Node[][], firstTime: boolean) {
   }
 }
 
-function getLoss(network: nn.Node[][], dataPoints: Example2D[]): number {
+function getLoss(network: nn_kan.KANNode[][], dataPoints: Example2D[]): number {
   let loss = 0;
   for (let i = 0; i < dataPoints.length; i++) {
     let dataPoint = dataPoints[i];
     let input = constructInput(dataPoint.x, dataPoint.y);
-    let output = nn.forwardProp(network, input);
+    let output = nn_kan.kanForwardProp(network, input);
     loss += nn.Errors.SQUARE.error(output, dataPoint.label);
   }
   return loss / dataPoints.length;
@@ -856,7 +867,7 @@ function updateUI(firstStep = false) {
   // Get the decision boundary of the network.
   updateDecisionBoundary(network, firstStep);
   let selectedId = selectedNodeId != null ?
-      selectedNodeId : nn.getOutputNode(network).id;
+      selectedNodeId : nn_kan.getKANOutputNode(network).id;
   heatMap.updateBackground(boundary[selectedId], state.discretize);
 
   // Update all decision boundaries.
@@ -910,10 +921,10 @@ function oneStep(): void {
   iter++;
   trainData.forEach((point, i) => {
     let input = constructInput(point.x, point.y);
-    nn.forwardProp(network, input);
-    nn.backProp(network, point.label, nn.Errors.SQUARE);
+    nn_kan.kanForwardProp(network, input);
+    nn_kan.kanBackProp(network, point.label, nn.Errors.SQUARE);
     if ((i + 1) % state.batchSize === 0) {
-      nn.updateWeights(network, state.learningRate, state.regularizationRate);
+      nn_kan.updateKANWeights(network, state.learningRate);
     }
   });
   // Compute the loss.
@@ -922,15 +933,17 @@ function oneStep(): void {
   updateUI();
 }
 
-export function getOutputWeights(network: nn.Node[][]): number[] {
+export function getOutputWeights(network: nn_kan.KANNode[][]): number[] {
   let weights: number[] = [];
   for (let layerIdx = 0; layerIdx < network.length - 1; layerIdx++) {
     let currentLayer = network[layerIdx];
     for (let i = 0; i < currentLayer.length; i++) {
       let node = currentLayer[i];
-      for (let j = 0; j < node.outputs.length; j++) {
-        let output = node.outputs[j];
-        weights.push(output.weight);
+      for (let j = 0; j < node.outputEdges.length; j++) {
+        let edge = node.outputEdges[j];
+        // For KAN, return average of control points
+        let avgWeight = edge.learnableFunction.controlPoints.reduce((a, b) => a + b, 0) / edge.learnableFunction.controlPoints.length;
+        weights.push(avgWeight);
       }
     }
   }
@@ -949,14 +962,12 @@ function reset(onStartup=false) {
   d3.select("#layers-label").text("Hidden layer" + suffix);
   d3.select("#num-layers").text(state.numHiddenLayers);
 
-  // Make a simple network.
+  // Make a KAN network.
   iter = 0;
   let numInputs = constructInput(0 , 0).length;
   let shape = [numInputs].concat(state.networkShape).concat([1]);
-  let outputActivation = (state.problem === Problem.REGRESSION) ?
-      nn.Activations.LINEAR : nn.Activations.TANH;
-  network = nn.buildNetwork(shape, state.activation, outputActivation,
-      state.regularization, constructInputIds(), state.initZero);
+  
+  network = nn_kan.buildKANNetwork(shape, constructInputIds(), state.gridSize, false);
   lossTrain = getLoss(network, trainData);
   lossTest = getLoss(network, testData);
   drawNetwork(network);
