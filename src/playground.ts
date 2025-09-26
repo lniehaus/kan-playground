@@ -967,7 +967,7 @@ function reset(onStartup=false) {
   let numInputs = constructInput(0 , 0).length;
   let shape = [numInputs].concat(state.networkShape).concat([1]);
   
-  network = nn_kan.buildKANNetwork(shape, constructInputIds(), state.gridSize, false);
+  network = nn_kan.buildKANNetwork(shape, constructInputIds(), state.gridSize, 3, false);
   lossTrain = getLoss(network, trainData);
   lossTest = getLoss(network, testData);
   drawNetwork(network);
