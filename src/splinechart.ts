@@ -21,6 +21,10 @@ export interface SplineChartSettings {
   showControlPoints?: boolean;
   showKnots?: boolean;
   showGrid?: boolean;
+  showXAxisLabels?: boolean;
+  showYAxisLabels?: boolean;
+  showXAxisValues?: boolean;
+  showYAxisValues?: boolean;
   title?: string;
   width?: number;
   height?: number;
@@ -31,10 +35,14 @@ export interface SplineChartSettings {
  * Shows the spline curve, control points, knot positions, and grid lines.
  */
 export class SplineChart {
-  private settings: SplineChartSettings = {
+  protected settings: SplineChartSettings = {
     showControlPoints: true,
     showKnots: false,
     showGrid: true,
+    showXAxisLabels: true,
+    showYAxisLabels: true,
+    showXAxisValues: true,
+    showYAxisValues: true,
     title: "Learnable Function",
     width: 300,
     height: 200
@@ -107,8 +115,13 @@ export class SplineChart {
     // X axis
     let xAxis = d3.svg.axis()
       .scale(this.xScale)
-      .orient("bottom")
-      .ticks(5);
+      .orient("bottom");
+
+    if (this.settings.showXAxisValues) {
+      xAxis.ticks(5);
+    } else {
+      xAxis.ticks(0);
+    }
 
     this.svg.append("g")
       .attr("class", "x axis")
@@ -118,30 +131,39 @@ export class SplineChart {
     // Y axis
     let yAxis = d3.svg.axis()
       .scale(this.yScale)
-      .orient("left")
-      .ticks(5);
+      .orient("left");
+
+    if (this.settings.showYAxisValues) {
+      yAxis.ticks(5);
+    } else {
+      yAxis.ticks(0);
+    }
 
     this.svg.append("g")
       .attr("class", "y axis")
       .call(yAxis);
 
-    // Add axis labels
-    this.svg.append("text")
-      .attr("class", "axis-label")
-      .attr("transform", "rotate(-90)")
-      .attr("y", 0 - this.margin.left)
-      .attr("x", 0 - (this.height / 2))
-      .attr("dy", "1em")
-      .style("text-anchor", "middle")
-      .style("font-size", "12px")
-      .text("f(x)");
+    // Add axis labels conditionally
+    if (this.settings.showYAxisLabels) {
+      this.svg.append("text")
+        .attr("class", "axis-label y-label")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 0 - this.margin.left)
+        .attr("x", 0 - (this.height / 2))
+        .attr("dy", "1em")
+        .style("text-anchor", "middle")
+        .style("font-size", "12px")
+        .text("f(x)");
+    }
 
-    this.svg.append("text")
-      .attr("class", "axis-label")
-      .attr("transform", `translate(${this.width / 2}, ${this.height + this.margin.bottom - 5})`)
-      .style("text-anchor", "middle")
-      .style("font-size", "12px")
-      .text("x");
+    if (this.settings.showXAxisLabels) {
+      this.svg.append("text")
+        .attr("class", "axis-label x-label")
+        .attr("transform", `translate(${this.width / 2}, ${this.height + this.margin.bottom - 5})`)
+        .style("text-anchor", "middle")
+        .style("font-size", "12px")
+        .text("x");
+    }
   }
 
   private addGrid(): void {
@@ -230,8 +252,13 @@ export class SplineChart {
     // Update Y axis
     let yAxis = d3.svg.axis()
       .scale(this.yScale)
-      .orient("left")
-      .ticks(5);
+      .orient("left");
+
+    if (this.settings.showYAxisValues) {
+      yAxis.ticks(5);
+    } else {
+      yAxis.ticks(0);
+    }
 
     this.svg.select(".y.axis")
       .transition()
@@ -376,9 +403,70 @@ export class SplineChart {
       this.settings[prop] = newSettings[prop];
     }
 
+    // Update axes if axis settings changed
+    if ('showXAxisLabels' in newSettings || 'showYAxisLabels' in newSettings ||
+        'showXAxisValues' in newSettings || 'showYAxisValues' in newSettings) {
+      this.updateAxes();
+    }
+
     // Re-render with new settings
     if (this.currentFunction) {
       this.updateFunction(this.currentFunction);
+    }
+  }
+
+  private updateAxes(): void {
+    // Remove existing axis labels
+    this.svg.selectAll(".axis-label").remove();
+
+    // Update X axis
+    let xAxis = d3.svg.axis()
+      .scale(this.xScale)
+      .orient("bottom");
+
+    if (this.settings.showXAxisValues) {
+      xAxis.ticks(5);
+    } else {
+      xAxis.ticks(0);
+    }
+
+    this.svg.select(".x.axis")
+      .call(xAxis);
+
+    // Update Y axis
+    let yAxis = d3.svg.axis()
+      .scale(this.yScale)
+      .orient("left");
+
+    if (this.settings.showYAxisValues) {
+      yAxis.ticks(5);
+    } else {
+      yAxis.ticks(0);
+    }
+
+    this.svg.select(".y.axis")
+      .call(yAxis);
+
+    // Re-add axis labels if enabled
+    if (this.settings.showYAxisLabels) {
+      this.svg.append("text")
+        .attr("class", "axis-label y-label")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 0 - this.margin.left)
+        .attr("x", 0 - (this.height / 2))
+        .attr("dy", "1em")
+        .style("text-anchor", "middle")
+        .style("font-size", "12px")
+        .text("f(x)");
+    }
+
+    if (this.settings.showXAxisLabels) {
+      this.svg.append("text")
+        .attr("class", "axis-label x-label")
+        .attr("transform", `translate(${this.width / 2}, ${this.height + this.margin.bottom - 5})`)
+        .style("text-anchor", "middle")
+        .style("font-size", "12px")
+        .text("x");
     }
   }
 
@@ -505,8 +593,13 @@ export class MultiSplineChart extends SplineChart {
     
     let yAxis = d3.svg.axis()
       .scale(this.yScale)
-      .orient("left")
-      .ticks(5);
+      .orient("left");
+
+    if (this.settings.showYAxisValues) {
+      yAxis.ticks(5);
+    } else {
+      yAxis.ticks(0);
+    }
 
     this.svg.select(".y.axis")
       .transition()

@@ -910,7 +910,11 @@ function initializeSplineChart() {
     // showGrid: true
     showControlPoints: false,
     showKnots: false,
-    showGrid: false
+    showGrid: false,
+    showXAxisLabels: false,
+    showYAxisLabels: false,
+    showXAxisValues: false,
+    showYAxisValues: false
   });
 
   // Update with the first learnable function if network exists
