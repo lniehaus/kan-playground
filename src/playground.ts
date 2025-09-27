@@ -898,8 +898,8 @@ function initializeSplineChart() {
 
   // Create the spline chart
   splineChart = new SplineChart(splineContainer, {
-    width: 200,
-    height: 100,
+    width: 30,
+    height: 30,
     title: "",
     showControlPoints: false,
     showKnots: false,

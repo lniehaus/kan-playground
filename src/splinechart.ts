@@ -37,14 +37,14 @@ export interface SplineChartSettings {
  */
 export class SplineChart {
   protected settings: SplineChartSettings = {
-    showControlPoints: true,
+    showControlPoints: false,
     showKnots: false,
-    showGrid: true,
-    showXAxisLabels: true,
-    showYAxisLabels: true,
-    showXAxisValues: true,
-    showYAxisValues: true,
-    showBorder: true,
+    showGrid: false,
+    showXAxisLabels: false,
+    showYAxisLabels: false,
+    showXAxisValues: false,
+    showYAxisValues: false,
+    showBorder: false,
     title: "Learnable Function",
     width: 300,
     height: 200
@@ -57,7 +57,10 @@ export class SplineChart {
   private chartContainer: any;
   protected width: number;
   protected height: number;
-  private margin = { top: 30, right: 20, bottom: 40, left: 40 };
+  // private baseMargin = { top: 30, right: 20, bottom: 40, left: 40 };
+  // private margin = { top: 30, right: 20, bottom: 40, left: 40 };
+  private baseMargin = { top: 5, right: 5, bottom: 5, left: 5 };
+  private margin = { top: 5, right: 5, bottom: 5, left: 5 };
   private currentFunction: LearnableFunction | null = null;
 
   constructor(container: any, userSettings?: SplineChartSettings) {
@@ -68,11 +71,42 @@ export class SplineChart {
       }
     }
 
+    this.updateMargins();
     this.width = this.settings.width! - this.margin.left - this.margin.right;
     this.height = this.settings.height! - this.margin.top - this.margin.bottom;
     this.container = container;
 
     this.initializeChart();
+  }
+
+  private updateMargins(): void {
+    // Start with base margins
+    this.margin = { ...this.baseMargin };
+
+    // Expand left margin if y-axis elements are shown
+    if (this.settings.showYAxisLabels && this.settings.showYAxisValues) {
+      this.margin.left = 50;
+    } else if (this.settings.showYAxisLabels || this.settings.showYAxisValues) {
+      this.margin.left = 30; 
+    }
+
+    // Reduce right margin when no additional right-side content is needed
+    // This is especially useful when the chart is purely functional without legends or extra labels
+    if (this.settings.showYAxisLabels || this.settings.showYAxisValues) {
+      this.margin.right = 20; // Minimal margin to match left side
+    }
+
+    // Extend bottom margin if x-axis elements are shown
+    if (this.settings.showXAxisLabels && this.settings.showXAxisValues) {
+      this.margin.bottom = 40; 
+    } else if (this.settings.showXAxisLabels || this.settings.showXAxisValues) {
+      this.margin.bottom = 30; 
+    }
+
+    // Reduce top margin if title exists
+    if (this.settings.title && this.settings.title.trim() !== "") {
+      this.margin.top = 30; // Minimal margin to match bottom when no axes
+    }
   }
 
   private initializeChart(): void {
@@ -97,6 +131,53 @@ export class SplineChart {
       .attr("transform", `translate(${this.margin.left},${this.margin.top})`);
 
     // Set up scales
+    this.xScale = d3.scale.linear()
+      .domain([-1, 1])
+      .range([0, this.width]);
+
+    this.yScale = d3.scale.linear()
+      .domain([-2, 2])
+      .range([this.height, 0]);
+
+    // Add axes
+    this.addAxes();
+
+    // Add title
+    if (this.settings.title) {
+      this.svg.append("text")
+        .attr("class", "spline-title")
+        .attr("x", this.width / 2)
+        .attr("y", -10)
+        .attr("text-anchor", "middle")
+        .style("font-size", "14px")
+        .style("font-weight", "bold")
+        .text(this.settings.title);
+    }
+
+    // Add grid if enabled
+    if (this.settings.showGrid) {
+      this.addGrid();
+    }
+  }
+
+  private recreateChart(): void {
+    // Remove existing SVG
+    this.chartContainer.select("svg").remove();
+
+    // Update margins and dimensions
+    this.updateMargins();
+    this.width = this.settings.width! - this.margin.left - this.margin.right;
+    this.height = this.settings.height! - this.margin.top - this.margin.bottom;
+
+    // Recreate SVG with new transform
+    this.svg = this.chartContainer
+      .append("svg")
+      .attr("width", this.settings.width)
+      .attr("height", this.settings.height)
+      .append("g")
+      .attr("transform", `translate(${this.margin.left},${this.margin.top})`);
+
+    // Update scales with new dimensions
     this.xScale = d3.scale.linear()
       .domain([-1, 1])
       .range([0, this.width]);
@@ -428,28 +509,49 @@ export class SplineChart {
    * Update chart settings
    */
   updateSettings(newSettings: SplineChartSettings): void {
+    const oldSettings = { ...this.settings };
+    
     for (let prop in newSettings) {
       this.settings[prop] = newSettings[prop];
     }
 
-    // Update border if border setting changed
-    if ('showBorder' in newSettings) {
-      this.updateBorder();
-    }
+    // Check if margin-affecting settings changed
+    const marginAffectingSettings = ['showYAxisLabels', 'showYAxisValues', 'showXAxisLabels', 'showXAxisValues', 'title'];
+    const needsRecreation = marginAffectingSettings.some(setting => 
+      setting in newSettings && oldSettings[setting] !== newSettings[setting]
+    );
 
-    // Update axes if axis settings changed
-    if ('showXAxisLabels' in newSettings || 'showYAxisLabels' in newSettings ||
-        'showXAxisValues' in newSettings || 'showYAxisValues' in newSettings) {
-      this.updateAxes();
-    }
+    if (needsRecreation) {
+      // Store current function to re-render after recreation
+      const currentFunc = this.currentFunction;
+      this.recreateChart();
+      if (currentFunc) {
+        this.updateFunction(currentFunc);
+      }
+    } else {
+      // Update border if border setting changed
+      if ('showBorder' in newSettings) {
+        this.updateBorder();
+      }
 
-    // Re-render with new settings
-    if (this.currentFunction) {
-      this.updateFunction(this.currentFunction);
+      // Update axes if only axis settings changed (but not margin-affecting ones)
+      if ('showGrid' in newSettings) {
+        // Re-add or remove grid
+        this.svg.selectAll(".grid").remove();
+        if (this.settings.showGrid) {
+          this.addGrid();
+        }
+      }
+
+      // Re-render with new settings
+      if (this.currentFunction) {
+        this.updateFunction(this.currentFunction);
+      }
     }
   }
 
   private updateAxes(): void {
+    // This method is now mainly used for updating existing axes without recreation
     // Remove existing axis labels
     this.svg.selectAll(".axis-label").remove();
 
