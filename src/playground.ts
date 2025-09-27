@@ -16,6 +16,7 @@ limitations under the License.
 import * as nn from "./nn";
 import * as nn_kan from "./nn_kan";
 import {HeatMap, reduceMatrix} from "./heatmap";
+import {SplineChart} from "./splinechart"; // Add this import
 import {
   State,
   datasets,
@@ -178,6 +179,10 @@ let lossTest = 0;
 let player = new Player();
 let lineChart = new AppendingLineChart(d3.select("#linechart"),
     ["#777", "black"]);
+// Add spline chart variable
+let splineChart: SplineChart = null;
+
+// ...existing code...
 
 function makeGUI() {
   d3.select("#reset-button").on("click", () => {
@@ -553,6 +558,9 @@ function drawNetwork(network: nn_kan.KANNode[][]): void {
   d3.select("#network").selectAll("div.canvas").remove();
   d3.select("#network").selectAll("div.plus-minus-neurons").remove();
 
+  // Initialize or recreate the spline chart in the output column
+  initializeSplineChart();
+
   // Get the width of the svg container.
   let padding = 3;
   let co = d3.select(".column.output").node() as HTMLDivElement;
@@ -865,6 +873,76 @@ function getLoss(network: nn_kan.KANNode[][], dataPoints: Example2D[]): number {
   return loss / dataPoints.length;
 }
 
+function initializeSplineChart() {
+  // Clear any existing spline chart
+  d3.select("#spline-chart-container").remove();
+  
+  // Create container in the output column
+  let outputColumn = d3.select(".column.output");
+  let splineContainer = outputColumn.append("div")
+    .attr("id", "spline-chart-container")
+    .style({
+      "margin-top": "20px",
+      "margin-bottom": "20px",
+      "border": "1px solid #ddd",
+      "border-radius": "4px",
+      "padding": "10px",
+      "background": "white"
+    });
+
+  // Add a title
+  splineContainer.append("h3")
+    .style({
+      "margin": "0 0 10px 0",
+      "font-size": "14px",
+      "font-weight": "bold",
+      "text-align": "center"
+    })
+    .text("First Learnable Function");
+
+  // Create the spline chart
+  splineChart = new SplineChart(splineContainer, {
+    width: 200,
+    height: 200,
+    title: "",
+    // showControlPoints: true,
+    // showKnots: false,
+    // showGrid: true
+    showControlPoints: false,
+    showKnots: false,
+    showGrid: false
+  });
+
+  // Update with the first learnable function if network exists
+  updateSplineChart();
+}
+
+function updateSplineChart() {
+  if (!splineChart || !network) {
+    return;
+  }
+
+  // Find the first learnable function in the network
+  let firstFunction: nn_kan.LearnableFunction = null;
+  
+  // Look for the first edge with a learnable function
+  outerLoop: for (let layerIdx = 1; layerIdx < network.length; layerIdx++) {
+    const currentLayer = network[layerIdx];
+    for (let nodeIdx = 0; nodeIdx < currentLayer.length; nodeIdx++) {
+      const node = currentLayer[nodeIdx];
+      if (node.inputEdges.length > 0) {
+        firstFunction = node.inputEdges[0].learnableFunction;
+        break outerLoop;
+      }
+    }
+  }
+
+  // Update the chart with the first function
+  if (firstFunction) {
+    splineChart.updateFunction(firstFunction);
+  }
+}
+
 function updateUI(firstStep = false) {
   // Update the links visually.
   updateWeightsUI(network, d3.select("g.core"));
@@ -875,6 +953,9 @@ function updateUI(firstStep = false) {
   let selectedId = selectedNodeId != null ?
       selectedNodeId : nn_kan.getKANOutputNode(network).id;
   heatMap.updateBackground(boundary[selectedId], state.discretize);
+
+  // Update spline chart
+  updateSplineChart();
 
   // Update all decision boundaries.
   d3.select("#network").selectAll("div.canvas")

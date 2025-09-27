@@ -992,3 +992,59 @@ footer .links a:hover {
 #main-part .mdl-slider.is-upgraded:focus:not(:active)::-webkit-slider-thumb {
   box-shadow: 0 0 0 10px rgba(0,0,0, 0.12);
 }
+
+#spline-chart-container {
+  box-sizing: border-box;
+}
+
+#spline-chart-container svg {
+  display: block;
+  margin: 0 auto;
+}
+
+#spline-chart-container .axis {
+  font-size: 11px;
+}
+
+#spline-chart-container .axis path,
+#spline-chart-container .axis line {
+  fill: none;
+  stroke: #333;
+  shape-rendering: crispEdges;
+}
+
+#spline-chart-container .spline-curve {
+  fill: none;
+  stroke: #2196F3;
+  stroke-width: 2;
+}
+
+#spline-chart-container .control-point {
+  fill: #FF5722;
+  stroke: #D84315;
+  stroke-width: 2;
+}
+
+#spline-chart-container .control-polygon {
+  fill: none;
+  stroke: #FF5722;
+  stroke-width: 1;
+  stroke-dasharray: 5,5;
+  opacity: 0.5;
+}
+
+#spline-chart-container .grid line {
+  stroke: #e0e0e0;
+  stroke-width: 1;
+}
+
+#spline-chart-container .axis-label {
+  font-size: 12px;
+  fill: #333;
+}
+
+#spline-chart-container .spline-title {
+  font-size: 14px;
+  font-weight: bold;
+  fill: #333;
+}
