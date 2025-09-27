@@ -25,6 +25,7 @@ export interface SplineChartSettings {
   showYAxisLabels?: boolean;
   showXAxisValues?: boolean;
   showYAxisValues?: boolean;
+  showBorder?: boolean;
   title?: string;
   width?: number;
   height?: number;
@@ -43,6 +44,7 @@ export class SplineChart {
     showYAxisLabels: true,
     showXAxisValues: true,
     showYAxisValues: true,
+    showBorder: true,
     title: "Learnable Function",
     width: 300,
     height: 200
@@ -52,6 +54,7 @@ export class SplineChart {
   protected xScale: any;
   protected yScale: any;
   private container: any;
+  private chartContainer: any;
   protected width: number;
   protected height: number;
   private margin = { top: 30, right: 20, bottom: 40, left: 40 };
@@ -73,8 +76,20 @@ export class SplineChart {
   }
 
   private initializeChart(): void {
+    // Create a wrapper div for the chart with optional border
+    this.chartContainer = this.container
+      .append("div")
+      .attr("class", "spline-chart-wrapper")
+      .style({
+        "display": "inline-block",
+        "position": "relative"
+      });
+
+    // Apply border if enabled
+    this.updateBorder();
+
     // Create SVG
-    this.svg = this.container
+    this.svg = this.chartContainer
       .append("svg")
       .attr("width", this.settings.width)
       .attr("height", this.settings.height)
@@ -108,6 +123,20 @@ export class SplineChart {
     // Add grid if enabled
     if (this.settings.showGrid) {
       this.addGrid();
+    }
+  }
+
+  private updateBorder(): void {
+    if (this.settings.showBorder) {
+      this.chartContainer.style({
+        "border": "1px solid #ddd",
+        "border-radius": "3px"
+      });
+    } else {
+      this.chartContainer.style({
+        "border": "none",
+        "border-radius": "0"
+      });
     }
   }
 
@@ -401,6 +430,11 @@ export class SplineChart {
   updateSettings(newSettings: SplineChartSettings): void {
     for (let prop in newSettings) {
       this.settings[prop] = newSettings[prop];
+    }
+
+    // Update border if border setting changed
+    if ('showBorder' in newSettings) {
+      this.updateBorder();
     }
 
     // Update axes if axis settings changed

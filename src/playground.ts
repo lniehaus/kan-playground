@@ -182,8 +182,6 @@ let lineChart = new AppendingLineChart(d3.select("#linechart"),
 // Add spline chart variable
 let splineChart: SplineChart = null;
 
-// ...existing code...
-
 function makeGUI() {
   d3.select("#reset-button").on("click", () => {
     reset();
@@ -884,8 +882,6 @@ function initializeSplineChart() {
     .style({
       "margin-top": "20px",
       "margin-bottom": "20px",
-      "border": "1px solid #ddd",
-      "border-radius": "4px",
       "padding": "10px",
       "background": "white"
     });
@@ -903,18 +899,16 @@ function initializeSplineChart() {
   // Create the spline chart
   splineChart = new SplineChart(splineContainer, {
     width: 200,
-    height: 200,
+    height: 100,
     title: "",
-    // showControlPoints: true,
-    // showKnots: false,
-    // showGrid: true
     showControlPoints: false,
     showKnots: false,
     showGrid: false,
     showXAxisLabels: false,
     showYAxisLabels: false,
     showXAxisValues: false,
-    showYAxisValues: false
+    showYAxisValues: false,
+    showBorder: true
   });
 
   // Update with the first learnable function if network exists
