@@ -1005,16 +1005,16 @@ function initializeSplineChart() {
 
   // Create the spline chart
   splineChart = new SplineChart(splineContainer, {
-    width: SPLINE_CHART_SIZE,
-    height: SPLINE_CHART_SIZE,
+    width: 300,
+    height: 200,
     title: "",
-    showControlPoints: false,
+    showControlPoints: true,
     showKnots: false,
-    showGrid: false,
-    showXAxisLabels: false,
-    showYAxisLabels: false,
-    showXAxisValues: false,
-    showYAxisValues: false,
+    showGrid: true,
+    showXAxisLabels: true,
+    showYAxisLabels: true,
+    showXAxisValues: true,
+    showYAxisValues: true,
     showBorder: true
   });
 
