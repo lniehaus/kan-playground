@@ -833,14 +833,14 @@ function drawLinkWithSplineChart(
     height: SPLINE_CHART_SIZE,
     title: "",
     showControlPoints: false,
+    showOldControlPaths: false,
     showKnots: false,
     showGrid: false,
     showXAxisLabels: false,
     showYAxisLabels: false,
     showXAxisValues: false,
     showYAxisValues: false,
-    showBorder: true,
-    showOldControlPaths: false
+    showBorder: true
   });
 
   // Store the spline chart for updates
@@ -1009,14 +1009,14 @@ function initializeSplineChart() {
     height: 200,
     title: "",
     showControlPoints: true,
+    showOldControlPaths: false,
     showKnots: false,
     showGrid: true,
     showXAxisLabels: true,
     showYAxisLabels: true,
     showXAxisValues: true,
     showYAxisValues: true,
-    showBorder: true,
-    showOldControlPaths: false
+    showBorder: true
   });
 
   // Update with the first learnable function if network exists

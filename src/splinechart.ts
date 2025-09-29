@@ -19,6 +19,7 @@ import { LearnableFunction } from './nn_kan';
 export interface SplineChartSettings {
   [key: string]: any;
   showControlPoints?: boolean;
+  showOldControlPaths?: boolean;
   showKnots?: boolean;
   showGrid?: boolean;
   showXAxisLabels?: boolean;
@@ -26,7 +27,6 @@ export interface SplineChartSettings {
   showXAxisValues?: boolean;
   showYAxisValues?: boolean;
   showBorder?: boolean;
-  showOldControlPaths?: boolean;  // New parameter
   title?: string;
   width?: number;
   height?: number;
@@ -39,6 +39,7 @@ export interface SplineChartSettings {
 export class SplineChart {
   protected settings: SplineChartSettings = {
     showControlPoints: false,
+    showOldControlPaths: false,
     showKnots: false,
     showGrid: false,
     showXAxisLabels: false,
@@ -46,7 +47,6 @@ export class SplineChart {
     showXAxisValues: false,
     showYAxisValues: false,
     showBorder: false,
-    showOldControlPaths: false,  // Default: don't show old paths
     title: "Learnable Function",
     width: 300,
     height: 200
