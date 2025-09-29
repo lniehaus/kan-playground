@@ -423,8 +423,8 @@ function updateWeightsUI(network: nn_kan.KANNode[][], container) {
       let node = currentLayer[i];
       for (let j = 0; j < node.inputEdges.length; j++) {
         let edge = node.inputEdges[j];
-        // Get average spline value for visualization
-        let avgWeight = edge.learnableFunction.controlPoints.reduce((a, b) => a + b, 0) / edge.learnableFunction.controlPoints.length;
+        // Get norm of spline coefficients for visualization
+        let normWeight = Math.sqrt(edge.learnableFunction.controlPoints.reduce((sum, coeff) => sum + coeff * coeff, 0));
         
         let edgeId = `${edge.sourceNode.id}-${edge.destNode.id}`;
         
@@ -432,16 +432,16 @@ function updateWeightsUI(network: nn_kan.KANNode[][], container) {
         container.select(`#link${edgeId}-part1`)
             .style({
               "stroke-dashoffset": -iter / 3,
-              "stroke-width": linkWidthScale(Math.abs(avgWeight)),
-              "stroke": colorScale(avgWeight)
+              "stroke-width": linkWidthScale(normWeight),
+              "stroke": colorScale(normWeight)
             });
             
         // Update the second link (spline chart to destination)
         container.select(`#link${edgeId}-part2`)
             .style({
               "stroke-dashoffset": -iter / 3,
-              "stroke-width": linkWidthScale(Math.abs(avgWeight)),
-              "stroke": colorScale(avgWeight)
+              "stroke-width": linkWidthScale(normWeight),
+              "stroke": colorScale(normWeight)
             });
             
         // Update the spline chart
@@ -683,7 +683,7 @@ function drawNetwork(network: nn_kan.KANNode[][]): void {
             // Position callout at the spline chart location
             calloutWeights.style({
               display: null,
-              top: `${splinePosition.y + 5}px`,
+              top: `${splinePosition.y + SPLINE_CHART_SIZE/2 + 5}px`,
               left: `${splinePosition.x + 3}px`
             });
             targetIdWithCallout = edge.destNode.id;
@@ -897,24 +897,14 @@ function drawLinkWithSplineChart(
     d: diagonal(datum2, 0)
   });
 
-  // Add invisible thick links for hover detection
+  // Add invisible thick links for hover detection (without hover card functionality)
   container.append("path")
     .attr("d", diagonal(datum1, 0))
-    .attr("class", "link-hover")
-    .on("mouseenter", function() {
-      updateHoverCard(HoverType.WEIGHT, edge, d3.mouse(this));
-    }).on("mouseleave", function() {
-      updateHoverCard(null);
-    });
+    .attr("class", "link-hover");
 
   container.append("path")
     .attr("d", diagonal(datum2, 0))
-    .attr("class", "link-hover")
-    .on("mouseenter", function() {
-      updateHoverCard(HoverType.WEIGHT, edge, d3.mouse(this));
-    }).on("mouseleave", function() {
-      updateHoverCard(null);
-    });
+    .attr("class", "link-hover");
 
   return [line1, line2];
 }
@@ -1157,9 +1147,9 @@ export function getOutputWeights(network: nn_kan.KANNode[][]): number[] {
       let node = currentLayer[i];
       for (let j = 0; j < node.outputEdges.length; j++) {
         let edge = node.outputEdges[j];
-        // For KAN, return average of control points
-        let avgWeight = edge.learnableFunction.controlPoints.reduce((a, b) => a + b, 0) / edge.learnableFunction.controlPoints.length;
-        weights.push(avgWeight);
+        // For KAN, return norm of control points
+        let normWeight = Math.sqrt(edge.learnableFunction.controlPoints.reduce((sum, coeff) => sum + coeff * coeff, 0));
+        weights.push(normWeight);
       }
     }
   }
@@ -1341,14 +1331,6 @@ function simulationStarted() {
   parametersChanged = false;
 }
 
-drawDatasetThumbnails();
-initTutorial();
-makeGUI();
-initializeHoverCard();
-generateData(true);
-reset(true);
-hideControls();
-
 function updateHoverCard(type: HoverType, nodeOrEdge?: nn_kan.KANNode | nn_kan.KANEdge, coordinates?: number[]) {
   let hovercard = d3.select("#hovercard");
   
@@ -1384,8 +1366,8 @@ function updateHoverCard(type: HoverType, nodeOrEdge?: nn_kan.KANNode | nn_kan.K
   } else if (type === HoverType.WEIGHT) {
     let edge = nodeOrEdge as nn_kan.KANEdge;
     d3.select("#hovercard .type").text("Learnable Function");
-    let avgWeight = edge.learnableFunction.controlPoints.reduce((a, b) => a + b, 0) / edge.learnableFunction.controlPoints.length;
-    d3.select("#hovercard .value").text(`Avg: ${avgWeight.toFixed(2)}`);
+    let normWeight = Math.sqrt(edge.learnableFunction.controlPoints.reduce((sum, coeff) => sum + coeff * coeff, 0));
+    d3.select("#hovercard .value").text(`Norm: ${normWeight.toFixed(2)}`);
   }
 }
 
@@ -1461,3 +1443,11 @@ function getRelativeHeight(selection: d3.Selection<any>) {
   }
   return node.offsetHeight + node.offsetTop;
 }
+
+drawDatasetThumbnails();
+initTutorial();
+makeGUI();
+initializeHoverCard();
+generateData(true);
+reset(true);
+hideControls();
