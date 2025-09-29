@@ -183,6 +183,8 @@ let lineChart = new AppendingLineChart(d3.select("#linechart"),
 // Add spline chart variable
 let splineChart: SplineChart = null;
 let edgeSplineCharts: {[edgeId: string]: SplineChart} = {};
+// Hover card timeout to prevent flickering
+let hoverCardTimeout: number = null;
 
 function makeGUI() {
   d3.select("#reset-button").on("click", () => {
@@ -1342,20 +1344,36 @@ function simulationStarted() {
 drawDatasetThumbnails();
 initTutorial();
 makeGUI();
+initializeHoverCard();
 generateData(true);
 reset(true);
 hideControls();
 
 function updateHoverCard(type: HoverType, nodeOrEdge?: nn_kan.KANNode | nn_kan.KANEdge, coordinates?: number[]) {
   let hovercard = d3.select("#hovercard");
+  
+  // Clear any existing timeout
+  if (hoverCardTimeout !== null) {
+    clearTimeout(hoverCardTimeout);
+    hoverCardTimeout = null;
+  }
+  
   if (type == null) {
-    hovercard.style("display", "none");
+    // Delay hiding the hover card to allow mouse to move to it
+    hoverCardTimeout = setTimeout(() => {
+      hovercard.style("display", "none");
+      hoverCardTimeout = null;
+    }, 100);
     return;
   }
   
+  // Position the hover card offset from the mouse to prevent immediate overlap
+  let offsetX = 15;
+  let offsetY = -10;
+  
   hovercard.style({
-    "left": coordinates[0] + "px",
-    "top": coordinates[1] + "px",
+    "left": (coordinates[0] + offsetX) + "px",
+    "top": (coordinates[1] + offsetY) + "px",
     "display": "block"
   });
   
@@ -1369,6 +1387,24 @@ function updateHoverCard(type: HoverType, nodeOrEdge?: nn_kan.KANNode | nn_kan.K
     let avgWeight = edge.learnableFunction.controlPoints.reduce((a, b) => a + b, 0) / edge.learnableFunction.controlPoints.length;
     d3.select("#hovercard .value").text(`Avg: ${avgWeight.toFixed(2)}`);
   }
+}
+
+function initializeHoverCard() {
+  let hovercard = d3.select("#hovercard");
+  
+  // Add hover event handlers to the hover card itself
+  hovercard
+    .on("mouseenter", function() {
+      // Cancel any pending hide timeout when mouse enters hover card
+      if (hoverCardTimeout !== null) {
+        clearTimeout(hoverCardTimeout);
+        hoverCardTimeout = null;
+      }
+    })
+    .on("mouseleave", function() {
+      // Hide the hover card when mouse leaves it
+      updateHoverCard(null);
+    });
 }
 
 function addPlusMinusControl(x: number, layerIdx: number) {
