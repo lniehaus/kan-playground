@@ -839,7 +839,8 @@ function drawLinkWithSplineChart(
     showYAxisLabels: false,
     showXAxisValues: false,
     showYAxisValues: false,
-    showBorder: true
+    showBorder: true,
+    showOldControlPaths: false
   });
 
   // Store the spline chart for updates
@@ -1014,7 +1015,8 @@ function initializeSplineChart() {
     showYAxisLabels: true,
     showXAxisValues: true,
     showYAxisValues: true,
-    showBorder: true
+    showBorder: true,
+    showOldControlPaths: false
   });
 
   // Update with the first learnable function if network exists

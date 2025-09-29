@@ -26,6 +26,7 @@ export interface SplineChartSettings {
   showXAxisValues?: boolean;
   showYAxisValues?: boolean;
   showBorder?: boolean;
+  showOldControlPaths?: boolean;  // New parameter
   title?: string;
   width?: number;
   height?: number;
@@ -45,6 +46,7 @@ export class SplineChart {
     showXAxisValues: false,
     showYAxisValues: false,
     showBorder: false,
+    showOldControlPaths: false,  // Default: don't show old paths
     title: "Learnable Function",
     width: 300,
     height: 200
@@ -59,8 +61,8 @@ export class SplineChart {
   protected height: number;
   // private baseMargin = { top: 30, right: 20, bottom: 40, left: 40 };
   // private margin = { top: 30, right: 20, bottom: 40, left: 40 };
-  private baseMargin = { top: 5, right: 5, bottom: 5, left: 5 };
-  private margin = { top: 5, right: 5, bottom: 5, left: 5 };
+  private baseMargin = { top: 2, right: 2, bottom: 2, left: 2 };
+  private margin = { top: 2, right: 2, bottom: 2, left: 2 };
   private currentFunction: LearnableFunction | null = null;
 
   constructor(container: any, userSettings?: SplineChartSettings) {
@@ -345,6 +347,11 @@ export class SplineChart {
     this.svg.selectAll(".spline-curve").remove();
     this.svg.selectAll(".control-point").remove();
     this.svg.selectAll(".knot-line").remove();
+    
+    // Clear old control paths only if showOldControlPaths is false
+    if (!this.settings.showOldControlPaths) {
+      this.svg.selectAll(".control-polygon").remove();
+    }
 
     // Draw the spline curve
     this.drawSplineCurve();
@@ -476,15 +483,33 @@ export class SplineChart {
         .y((d: any) => this.yScale(d.y))
         .interpolate("linear");
 
+      // Create a unique class for the current control polygon
+      const timestamp = Date.now();
+      const polygonClass = this.settings.showOldControlPaths ? 
+        `control-polygon control-polygon-${timestamp}` : 
+        "control-polygon";
+
       this.svg.append("path")
         .datum(controlPointData)
-        .attr("class", "control-polygon")
+        .attr("class", polygonClass)
         .attr("d", controlLine)
         .style("fill", "none")
         .style("stroke", "#FF5722")
         .style("stroke-width", 1)
         .style("stroke-dasharray", "5,5")
-        .style("opacity", 0.5);
+        .style("opacity", this.settings.showOldControlPaths ? 0.3 : 0.5);
+
+      // If showing old paths, fade them over time
+      if (this.settings.showOldControlPaths) {
+        // Fade older paths
+        this.svg.selectAll(".control-polygon")
+          .filter(function() {
+            return !d3.select(this).classed(`control-polygon-${timestamp}`);
+          })
+          .transition()
+          .duration(500)
+          .style("opacity", 0.1);
+      }
     }
   }
 
