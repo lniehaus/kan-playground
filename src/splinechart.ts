@@ -442,7 +442,9 @@ export class SplineChart {
       .attr("class", "spline-curve")
       .attr("d", line)
       .style("fill", "none")
-      .style("stroke", "#2196F3")
+      //.style("stroke", "#2196F3")
+      //.style("stroke", "#1B998B")
+      .style("stroke", "#7D2E68")
       .style("stroke-width", 3)
       .style("stroke-linecap", "round");
   }
@@ -706,7 +708,6 @@ export class SplineChart {
 export class MultiSplineChart extends SplineChart {
   private functions: {[id: string]: LearnableFunction} = {};
   private colors: string[] = ["#2196F3", "#FF5722", "#4CAF50", "#FF9800", "#9C27B0", "#00BCD4"];
-
   /**
    * Add or update a function
    */
