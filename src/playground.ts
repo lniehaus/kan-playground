@@ -650,22 +650,23 @@ function drawNetwork(network: nn_kan.KANNode[][]): void {
   let cy = nodeIndexScale(0) + RECT_SIZE / 2;
   node2coord[node.id] = {cx, cy};
 
-  // Now draw all edges with spline charts
+  // Calculate global spline chart positions for each layer
   for (let layerIdx = 1; layerIdx < numLayers; layerIdx++) {
+    let splinePositions = calculateGlobalSplinePositions(network, layerIdx, node2coord);
+    
+    // Draw all edges with spline charts for this layer
     let currentLayer = network[layerIdx];
     for (let nodeIdx = 0; nodeIdx < currentLayer.length; nodeIdx++) {
       let node = currentLayer[nodeIdx];
       
-      // Calculate vertical spacing for spline charts when multiple edges connect to the same node
-      let edgeSpacing = node.inputEdges.length > 1 ? 40 : 0;
-      let startOffset = -(node.inputEdges.length - 1) * edgeSpacing / 2;
-      
       for (let edgeIdx = 0; edgeIdx < node.inputEdges.length; edgeIdx++) {
         let edge = node.inputEdges[edgeIdx];
-        let verticalOffset = startOffset + edgeIdx * edgeSpacing;
+        let edgeKey = `${edge.sourceNode.id}-${edge.destNode.id}`;
+        let splinePosition = splinePositions[edgeKey];
         
         drawLinkWithSplineChart(edge, node2coord, network, container, 
-                              edgeIdx === 0, edgeIdx, node.inputEdges.length, verticalOffset);
+                              edgeIdx === 0, edgeIdx, node.inputEdges.length, 
+                              splinePosition);
         
         // Show callout to weights for the last edge of the last node in certain conditions
         if (targetIdWithCallout == null &&
@@ -678,15 +679,10 @@ function drawNetwork(network: nn_kan.KANNode[][]): void {
               edge.destNode.id !== idWithCallout &&
               prevLayer.length >= currentLayer.length) {
             // Position callout at the spline chart location
-            let source = node2coord[edge.sourceNode.id];
-            let dest = node2coord[edge.destNode.id];
-            let midX = (source.cx + dest.cx) / 2;
-            let midY = dest.cy + verticalOffset;
-            
             calloutWeights.style({
               display: null,
-              top: `${midY + 5}px`,
-              left: `${midX + 3}px`
+              top: `${splinePosition.y + 5}px`,
+              left: `${splinePosition.x + 3}px`
             });
             targetIdWithCallout = edge.destNode.id;
           }
@@ -707,158 +703,116 @@ function drawNetwork(network: nn_kan.KANNode[][]): void {
   d3.select(".column.features").style("height", height + "px");
 }
 
-function getRelativeHeight(selection) {
-  let node = selection.node() as HTMLAnchorElement;
-  return node.offsetHeight + node.offsetTop;
-}
-
-function addPlusMinusControl(x: number, layerIdx: number) {
-  let div = d3.select("#network").append("div")
-    .classed("plus-minus-neurons", true)
-    .style("left", `${x - 10}px`);
-
-  let i = layerIdx - 1;
-  let firstRow = div.append("div").attr("class", `ui-numNodes${layerIdx}`);
-  firstRow.append("button")
-      .attr("class", "mdl-button mdl-js-button mdl-button--icon")
-      .on("click", () => {
-        let numNeurons = state.networkShape[i];
-        if (numNeurons >= 8) {
-          return;
-        }
-        state.networkShape[i]++;
-        parametersChanged = true;
-        reset();
-      })
-    .append("i")
-      .attr("class", "material-icons")
-      .text("add");
-
-  firstRow.append("button")
-      .attr("class", "mdl-button mdl-js-button mdl-button--icon")
-      .on("click", () => {
-        let numNeurons = state.networkShape[i];
-        if (numNeurons <= 1) {
-          return;
-        }
-        state.networkShape[i]--;
-        parametersChanged = true;
-        reset();
-      })
-    .append("i")
-      .attr("class", "material-icons")
-      .text("remove");
-
-  let suffix = state.networkShape[i] > 1 ? "s" : "";
-  div.append("div").text(
-    state.networkShape[i] + " neuron" + suffix
-  );
-}
-
-function updateHoverCard(type: HoverType, nodeOrEdge?: nn_kan.KANNode | nn_kan.KANEdge,
-    coordinates?: [number, number]) {
-  let hovercard = d3.select("#hovercard");
-  if (type == null) {
-    hovercard.style("display", "none");
-    d3.select("#svg").on("click", null);
-    return;
-  }
-  d3.select("#svg").on("click", () => {
-    hovercard.select(".value").style("display", "none");
-    let input = hovercard.select("input");
-    input.style("display", null);
-    input.on("input", function() {
-      if (this.value != null && this.value !== "") {
-        if (type === HoverType.WEIGHT) {
-          // For KAN edges, we can't directly set a single weight
-          // Instead, set all control points to the same value
-          // ToDo: find a better solution than setting all coefs to the same value
-          let edge = nodeOrEdge as nn_kan.KANEdge;
-          let newValue = +this.value;
-          for (let i = 0; i < edge.learnableFunction.controlPoints.length; i++) {
-            edge.learnableFunction.controlPoints[i] = newValue;
-          }
-        } else {
-          (nodeOrEdge as nn_kan.KANNode).bias = +this.value;
-        }
-        updateUI();
-      }
-    });
-    input.on("keypress", () => {
-      if ((d3.event as any).keyCode === 13) {
-        updateHoverCard(type, nodeOrEdge, coordinates);
-      }
-    });
-    (input.node() as HTMLInputElement).focus();
-  });
-  let value = (type === HoverType.WEIGHT) ?
-    (nodeOrEdge as nn_kan.KANEdge).learnableFunction.controlPoints.reduce((a, b) => a + b, 0) / (nodeOrEdge as nn_kan.KANEdge).learnableFunction.controlPoints.length :
-    (nodeOrEdge as nn_kan.KANNode).bias;
-  let name = (type === HoverType.WEIGHT) ? "Weight" : "Bias";
-  hovercard.style({
-    "left": `${coordinates[0] + 20}px`,
-    "top": `${coordinates[1]}px`,
-    "display": "block"
-  });
-  hovercard.select(".type").text(name);
-  hovercard.select(".value")
-    .style("display", null)
-    .text(value.toPrecision(2));
-  hovercard.select("input")
-    .property("value", value.toPrecision(2))
-    .style("display", "none");
-}
-
-function drawLink(
-    edge: nn_kan.KANEdge, node2coord: {[id: string]: {cx: number, cy: number}},
-    network: nn_kan.KANNode[][], container,
-    isFirst: boolean, index: number, length: number) {
-  let line = container.insert("path", ":first-child");
-  let source = node2coord[edge.sourceNode.id];
-  let dest = node2coord[edge.destNode.id];
-  let datum = {
-    source: {
-      y: source.cx + RECT_SIZE / 2 + 2,
-      x: source.cy
-    },
-    target: {
-      y: dest.cx - RECT_SIZE / 2,
-      x: dest.cy + ((index - (length - 1) / 2) / length) * 12
+function calculateGlobalSplinePositions(
+  network: nn_kan.KANNode[][], 
+  layerIdx: number, 
+  node2coord: {[id: string]: {cx: number, cy: number}}
+): {[edgeKey: string]: {x: number, y: number}} {
+  
+  const VERTICAL_BUFFER = 5;
+  const CHART_WITH_BUFFER = SPLINE_CHART_SIZE + (2 * VERTICAL_BUFFER);
+  
+  // Get SVG dimensions
+  let svg = d3.select("#svg");
+  let svgHeight = parseInt(svg.attr("height")) || 600; // fallback height
+  let padding = 3;
+  let minY = padding + SPLINE_CHART_SIZE / 2 + VERTICAL_BUFFER;
+  let maxY = svgHeight - padding - SPLINE_CHART_SIZE / 2 - VERTICAL_BUFFER;
+  
+  // Collect all edges for this layer and sort them by source node position, then destination node position
+  let allEdges: {edge: nn_kan.KANEdge, sourceY: number, destY: number, edgeKey: string}[] = [];
+  
+  let currentLayer = network[layerIdx];
+  for (let nodeIdx = 0; nodeIdx < currentLayer.length; nodeIdx++) {
+    let node = currentLayer[nodeIdx];
+    for (let edgeIdx = 0; edgeIdx < node.inputEdges.length; edgeIdx++) {
+      let edge = node.inputEdges[edgeIdx];
+      let edgeKey = `${edge.sourceNode.id}-${edge.destNode.id}`;
+      let sourceCoord = node2coord[edge.sourceNode.id];
+      let destCoord = node2coord[edge.destNode.id];
+      
+      allEdges.push({
+        edge: edge,
+        sourceY: sourceCoord.cy,
+        destY: destCoord.cy,
+        edgeKey: edgeKey
+      });
     }
-  };
-  let diagonal = d3.svg.diagonal().projection(d => [d.y, d.x]);
-  line.attr({
-    "marker-start": "url(#markerArrow)",
-    class: "link",
-    id: "link" + edge.sourceNode.id + "-" + edge.destNode.id,
-    d: diagonal(datum, 0)
+  }
+  
+  // Sort edges by source node Y position first, then by destination node Y position
+  allEdges.sort((a, b) => {
+    if (a.sourceY !== b.sourceY) {
+      return a.sourceY - b.sourceY;
+    }
+    return a.destY - b.destY;
   });
-
-  // Add an invisible thick link that will be used for
-  // showing the weight value on hover.
-  container.append("path")
-    .attr("d", diagonal(datum, 0))
-    .attr("class", "link-hover")
-    .on("mouseenter", function() {
-      updateHoverCard(HoverType.WEIGHT, edge, d3.mouse(this));
-    }).on("mouseleave", function() {
-      updateHoverCard(null);
-    });
-  return line;
+  
+  // Calculate total height needed for all spline charts
+  let totalHeight = (allEdges.length - 1) * CHART_WITH_BUFFER;
+  let availableHeight = maxY - minY;
+  
+  // Calculate spacing (compress if necessary)
+  let spacing = CHART_WITH_BUFFER;
+  if (totalHeight > availableHeight && allEdges.length > 1) {
+    spacing = Math.max(SPLINE_CHART_SIZE + 2, availableHeight / (allEdges.length - 1));
+    totalHeight = (allEdges.length - 1) * spacing;
+  }
+  
+  // Calculate starting Y position (center the group vertically)
+  let centerY = (minY + maxY) / 2;
+  let startY = centerY - totalHeight / 2;
+  
+  // Assign positions to each edge
+  let positions: {[edgeKey: string]: {x: number, y: number}} = {};
+  
+  allEdges.forEach((edgeInfo, index) => {
+    let sourceCoord = node2coord[edgeInfo.edge.sourceNode.id];
+    let destCoord = node2coord[edgeInfo.edge.destNode.id];
+    
+    let splineX = (sourceCoord.cx + destCoord.cx) / 2;
+    let splineY = startY + index * spacing;
+    
+    // Ensure the spline chart stays within bounds
+    splineY = Math.max(minY, Math.min(maxY, splineY));
+    
+    positions[edgeInfo.edgeKey] = {
+      x: splineX,
+      y: splineY
+    };
+  });
+  
+  return positions;
 }
 
 function drawLinkWithSplineChart(
     edge: nn_kan.KANEdge, node2coord: {[id: string]: {cx: number, cy: number}},
     network: nn_kan.KANNode[][], container,
-    isFirst: boolean, index: number, length: number, verticalOffset: number = 0) {
+    isFirst: boolean, index: number, length: number, 
+    splinePosition: {x: number, y: number}) {
   
   let source = node2coord[edge.sourceNode.id];
   let dest = node2coord[edge.destNode.id];
   let edgeId = `${edge.sourceNode.id}-${edge.destNode.id}`;
   
-  // Calculate spline chart position (midpoint between source and destination)
-  let splineX = (source.cx + dest.cx) / 2;
-  let splineY = dest.cy + verticalOffset;
+  // Get SVG dimensions and padding
+  let svg = d3.select("#svg");
+  let svgWidth = parseInt(svg.attr("width"));
+  let svgHeight = parseInt(svg.attr("height"));
+  let padding = 3;
+  
+  // Use the globally calculated spline position
+  let splineX = splinePosition.x;
+  let splineY = splinePosition.y;
+  
+  // Constrain spline chart position to stay within SVG bounds
+  let minX = padding + SPLINE_CHART_SIZE / 2;
+  let maxX = svgWidth - padding - SPLINE_CHART_SIZE / 2;
+  let minY = padding + SPLINE_CHART_SIZE / 2;
+  let maxY = svgHeight - padding - SPLINE_CHART_SIZE / 2;
+  
+  splineX = Math.max(minX, Math.min(maxX, splineX));
+  splineY = Math.max(minY, Math.min(maxY, splineY));
   
   // Create spline chart div
   let splineDiv = d3.select("#network").append("div")
@@ -870,7 +824,8 @@ function drawLinkWithSplineChart(
       top: `${splineY - SPLINE_CHART_SIZE / 2}px`,
       width: `${SPLINE_CHART_SIZE}px`,
       height: `${SPLINE_CHART_SIZE}px`,
-      "z-index": "10"
+      "z-index": "10",
+      "pointer-events": "auto"
     });
 
   // Create spline chart
@@ -894,7 +849,7 @@ function drawLinkWithSplineChart(
   // Update spline chart with the learnable function
   splineChart.updateFunction(edge.learnableFunction);
 
-  // Add hover functionality to spline chart
+  // Add hover functionality to spline chart div
   splineDiv.on("mouseenter", function() {
     updateHoverCard(HoverType.WEIGHT, edge, [splineX, splineY]);
   }).on("mouseleave", function() {
@@ -1389,3 +1344,83 @@ makeGUI();
 generateData(true);
 reset(true);
 hideControls();
+
+function updateHoverCard(type: HoverType, nodeOrEdge?: nn_kan.KANNode | nn_kan.KANEdge, coordinates?: number[]) {
+  let hovercard = d3.select("#hovercard");
+  if (type == null) {
+    hovercard.style("display", "none");
+    return;
+  }
+  
+  hovercard.style({
+    "left": coordinates[0] + "px",
+    "top": coordinates[1] + "px",
+    "display": "block"
+  });
+  
+  if (type === HoverType.BIAS) {
+    let node = nodeOrEdge as nn_kan.KANNode;
+    d3.select("#hovercard .type").text("Bias");
+    d3.select("#hovercard .value").text(node.bias.toFixed(2));
+  } else if (type === HoverType.WEIGHT) {
+    let edge = nodeOrEdge as nn_kan.KANEdge;
+    d3.select("#hovercard .type").text("Learnable Function");
+    let avgWeight = edge.learnableFunction.controlPoints.reduce((a, b) => a + b, 0) / edge.learnableFunction.controlPoints.length;
+    d3.select("#hovercard .value").text(`Avg: ${avgWeight.toFixed(2)}`);
+  }
+}
+
+function addPlusMinusControl(x: number, layerIdx: number) {
+  let div = d3.select("#network").append("div")
+    .classed("plus-minus-neurons", true)
+    .style({
+      position: "absolute",
+      left: `${x}px`,
+      top: "-60px"  // Move higher to avoid overlap with heatmaps
+    });
+
+  let i = layerIdx - 1;
+  let firstRow = div.append("div").attr("class", `ui-numHiddenLayers`);
+  firstRow.append("button")
+      .attr("class", "mdl-button mdl-js-button mdl-button--icon")
+      .on("click", () => {
+        let numNeurons = state.networkShape[i];
+        if (numNeurons >= 8) {
+          return;
+        }
+        state.networkShape[i]++;
+        parametersChanged = true;
+        reset();
+      })
+    .append("i")
+      .attr("class", "material-icons")
+      .text("add");
+
+  firstRow.append("button")
+      .attr("class", "mdl-button mdl-js-button mdl-button--icon")
+      .on("click", () => {
+        let numNeurons = state.networkShape[i];
+        if (numNeurons <= 1) {
+          return;
+        }
+        state.networkShape[i]--;
+        parametersChanged = true;
+        reset();
+      })
+    .append("i")
+      .attr("class", "material-icons")
+      .text("remove");
+
+  let suffix = state.networkShape[i] > 1 ? "s" : "";
+  firstRow.append("span").text(
+    state.networkShape[i] + " neuron" + suffix
+  );
+}
+
+function getRelativeHeight(selection: d3.Selection<any>) {
+  let node = selection.node() as HTMLElement;
+  if (!node) {
+    return 0;
+  }
+  return node.offsetHeight + node.offsetTop;
+}
