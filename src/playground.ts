@@ -183,8 +183,6 @@ let lineChart = new AppendingLineChart(d3.select("#linechart"),
 // Add spline chart variable
 let splineChart: SplineChart = null;
 let edgeSplineCharts: {[edgeId: string]: SplineChart} = {};
-// Hover card timeout to prevent flickering
-let hoverCardTimeout: number = null;
 // Hover card spline chart
 let hoverCardSplineChart: SplineChart = null;
 // Current edge being displayed in hover card
@@ -591,7 +589,7 @@ function drawNetwork(network: nn_kan.KANNode[][]): void {
   edgeSplineCharts = {};
 
   // Initialize or recreate the spline chart in the output column
-  initializeSplineChart();
+  // initializeSplineChart(); // Removed - First Learnable Function chart
 
   // Get the width of the svg container.
   let padding = 3;
@@ -730,6 +728,7 @@ function calculateGlobalSplinePositions(
   let padding = 3;
   let minY = padding + SPLINE_CHART_SIZE / 2 + VERTICAL_BUFFER;
   let maxY = svgHeight - padding - SPLINE_CHART_SIZE / 2 - VERTICAL_BUFFER;
+  console.log(`SVG Height: ${svgHeight}, MinY: ${minY}, MaxY: ${maxY}`);
   
   // Collect all edges for this layer and sort them by source node position, then destination node position
   let allEdges: {edge: nn_kan.KANEdge, sourceY: number, destY: number, edgeKey: string}[] = [];
@@ -980,6 +979,7 @@ function getLoss(network: nn_kan.KANNode[][], dataPoints: Example2D[]): number {
   return loss / dataPoints.length;
 }
 
+/* Removed - First Learnable Function chart
 function initializeSplineChart() {
   // Clear any existing spline chart
   d3.select("#spline-chart-container").remove();
@@ -1071,6 +1071,7 @@ function updateSplineChart() {
     }
   }
 }
+*/
 
 function updateUI(firstStep = false) {
   // Update the links visually.
@@ -1084,7 +1085,7 @@ function updateUI(firstStep = false) {
   heatMap.updateBackground(boundary[selectedId], state.discretize);
 
   // Update spline chart
-  updateSplineChart();
+  // updateSplineChart(); // Removed - First Learnable Function chart
 
   // Update all decision boundaries.
   d3.select("#network").selectAll("div.canvas")
@@ -1344,49 +1345,56 @@ function simulationStarted() {
 function updateHoverCard(type: HoverType, nodeOrEdge?: nn_kan.KANNode | nn_kan.KANEdge, coordinates?: number[]) {
   let hovercard = d3.select("#hovercard");
   
-  // Clear any existing timeout
-  if (hoverCardTimeout !== null) {
-    clearTimeout(hoverCardTimeout);
-    hoverCardTimeout = null;
-  }
-  
   if (type == null) {
-    // Delay hiding the hover card to allow mouse to move to it
-    hoverCardTimeout = setTimeout(() => {
-      hovercard.style("display", "none");
-      // Clean up hover card spline chart
-      if (hoverCardSplineChart) {
-        hoverCardSplineChart.clear();
-        hoverCardSplineChart = null;
-      }
-      currentHoverCardEdge = null;
-      hoverCardTimeout = null;
-    }, 100);
+    // Hide the hover card immediately
+    hovercard.style("display", "none");
+    // Clean up hover card spline chart
+    if (hoverCardSplineChart) {
+      hoverCardSplineChart.clear();
+      hoverCardSplineChart = null;
+    }
+    currentHoverCardEdge = null;
     return;
   }
   
-  // Position the hover card offset from the mouse to prevent immediate overlap
-  // Use different offsets based on hover card type
-  let offsetX = (type === HoverType.WEIGHT) ? -160 : 15; // Center weight charts, offset bias to right
-  let offsetY = (type === HoverType.WEIGHT) ? -110 : -10; // Center weight charts vertically, offset bias up
+  // Position the hover card below the spline chart
+  let finalX, finalY;
   
-  // Ensure hover card stays within viewport bounds
-  let finalX = coordinates[0] + offsetX;
-  let finalY = coordinates[1] + offsetY;
-  
-  // Prevent going off left edge
-  if (finalX < 10) {
+  if (type === HoverType.WEIGHT) {
+    // For weight hover cards, position below the spline chart
+    // Center the hover card horizontally relative to the spline chart
+    finalX = coordinates[0] - 150; // Center 300px hover card around spline chart
+    finalY = coordinates[1] + (SPLINE_CHART_SIZE / 2) + 10; // Position below spline chart with 10px gap
+    
+    // Ensure hover card stays within viewport bounds
+    // Prevent going off left edge
+    if (finalX < 10) {
+      finalX = 10;
+    }
+    
+    // Prevent going off right edge (300px hover card width + padding)
+    if (finalX + 310 > window.innerWidth) {
+      finalX = window.innerWidth - 310;
+    }
+    
+    // Prevent going off bottom edge (200px hover card height + padding)
+    if (finalY + 210 > window.innerHeight) {
+      // If no room below, position above the spline chart
+      finalY = coordinates[1] - (SPLINE_CHART_SIZE / 2) - 210;
+    }
+    
+  } else {
+    // For bias hover cards, use simple offset positioning
     finalX = coordinates[0] + 15;
-  }
-  
-  // Prevent going off right edge (assuming 320px max width)
-  if (finalX + 320 > window.innerWidth - 10) {
-    finalX = coordinates[0] - (type === HoverType.WEIGHT ? 320 : 150) - 15;
-  }
-  
-  // Prevent going off top edge
-  if (finalY < 10) {
-    finalY = coordinates[1] + 15;
+    finalY = coordinates[1] - 10;
+    
+    // Basic boundary checking for bias cards
+    if (finalX + 160 > window.innerWidth) {
+      finalX = coordinates[0] - 160;
+    }
+    if (finalY < 10) {
+      finalY = coordinates[1] + 15;
+    }
   }
   
   hovercard.style({
@@ -1433,24 +1441,6 @@ function updateHoverCard(type: HoverType, nodeOrEdge?: nn_kan.KANNode | nn_kan.K
     hoverCardSplineChart.updateFunction(edge.learnableFunction);
     currentHoverCardEdge = edge;
   }
-}
-
-function initializeHoverCard() {
-  let hovercard = d3.select("#hovercard");
-  
-  // Add hover event handlers to the hover card itself
-  hovercard
-    .on("mouseenter", function() {
-      // Cancel any pending hide timeout when mouse enters hover card
-      if (hoverCardTimeout !== null) {
-        clearTimeout(hoverCardTimeout);
-        hoverCardTimeout = null;
-      }
-    })
-    .on("mouseleave", function() {
-      // Hide the hover card when mouse leaves it
-      updateHoverCard(null);
-    });
 }
 
 function addPlusMinusControl(x: number, layerIdx: number) {
@@ -1511,7 +1501,6 @@ function getRelativeHeight(selection: d3.Selection<any>) {
 drawDatasetThumbnails();
 initTutorial();
 makeGUI();
-initializeHoverCard();
 generateData(true);
 reset(true);
 hideControls();
