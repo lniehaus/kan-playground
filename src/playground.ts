@@ -748,20 +748,19 @@ function calculateGlobalSplinePositions(
     return a.destY - b.destY;
   });
   
-  // Calculate total height needed for all spline charts
-  let totalHeight = (allEdges.length - 1) * CHART_WITH_BUFFER;
-  let availableHeight = maxY - minY;
-  
   // Calculate spacing (compress if necessary)
+  let availableHeight = maxY - minY;
   let spacing = CHART_WITH_BUFFER;
-  if (totalHeight > availableHeight && allEdges.length > 1) {
-    spacing = Math.max(SPLINE_CHART_SIZE + 2, availableHeight / (allEdges.length - 1));
-    totalHeight = (allEdges.length - 1) * spacing;
+  
+  if (allEdges.length > 1) {
+    let totalHeight = (allEdges.length - 1) * CHART_WITH_BUFFER;
+    if (totalHeight > availableHeight) {
+      spacing = Math.max(SPLINE_CHART_SIZE + 2, availableHeight / (allEdges.length - 1));
+    }
   }
   
-  // Calculate starting Y position (center the group vertically)
-  let centerY = (minY + maxY) / 2;
-  let startY = centerY - totalHeight / 2;
+  // Start from the top (minY) instead of centering
+  let startY = minY;
   
   // Assign positions to each edge
   let positions: {[edgeKey: string]: {x: number, y: number}} = {};
