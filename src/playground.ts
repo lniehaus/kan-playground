@@ -185,6 +185,10 @@ let splineChart: SplineChart = null;
 let edgeSplineCharts: {[edgeId: string]: SplineChart} = {};
 // Hover card timeout to prevent flickering
 let hoverCardTimeout: number = null;
+// Hover card spline chart
+let hoverCardSplineChart: SplineChart = null;
+// Current edge being displayed in hover card
+let currentHoverCardEdge: nn_kan.KANEdge = null;
 
 function makeGUI() {
   d3.select("#reset-button").on("click", () => {
@@ -447,6 +451,12 @@ function updateWeightsUI(network: nn_kan.KANNode[][], container) {
         // Update the spline chart
         if (edgeSplineCharts[edgeId]) {
           edgeSplineCharts[edgeId].updateFunction(edge.learnableFunction);
+        }
+        
+        // Update hover card spline chart if it's showing this edge
+        if (currentHoverCardEdge && hoverCardSplineChart && 
+            currentHoverCardEdge === edge) {
+          hoverCardSplineChart.updateFunction(edge.learnableFunction);
         }
       }
     }
@@ -1344,30 +1354,84 @@ function updateHoverCard(type: HoverType, nodeOrEdge?: nn_kan.KANNode | nn_kan.K
     // Delay hiding the hover card to allow mouse to move to it
     hoverCardTimeout = setTimeout(() => {
       hovercard.style("display", "none");
+      // Clean up hover card spline chart
+      if (hoverCardSplineChart) {
+        hoverCardSplineChart.clear();
+        hoverCardSplineChart = null;
+      }
+      currentHoverCardEdge = null;
       hoverCardTimeout = null;
     }, 100);
     return;
   }
   
   // Position the hover card offset from the mouse to prevent immediate overlap
-  let offsetX = 15;
-  let offsetY = -10;
+  // Use different offsets based on hover card type
+  let offsetX = (type === HoverType.WEIGHT) ? -160 : 15; // Center weight charts, offset bias to right
+  let offsetY = (type === HoverType.WEIGHT) ? -110 : -10; // Center weight charts vertically, offset bias up
+  
+  // Ensure hover card stays within viewport bounds
+  let finalX = coordinates[0] + offsetX;
+  let finalY = coordinates[1] + offsetY;
+  
+  // Prevent going off left edge
+  if (finalX < 10) {
+    finalX = coordinates[0] + 15;
+  }
+  
+  // Prevent going off right edge (assuming 320px max width)
+  if (finalX + 320 > window.innerWidth - 10) {
+    finalX = coordinates[0] - (type === HoverType.WEIGHT ? 320 : 150) - 15;
+  }
+  
+  // Prevent going off top edge
+  if (finalY < 10) {
+    finalY = coordinates[1] + 15;
+  }
   
   hovercard.style({
-    "left": (coordinates[0] + offsetX) + "px",
-    "top": (coordinates[1] + offsetY) + "px",
+    "left": finalX + "px",
+    "top": finalY + "px",
     "display": "block"
   });
   
+  // Clear existing content
+  hovercard.selectAll("*").remove();
+  
   if (type === HoverType.BIAS) {
     let node = nodeOrEdge as nn_kan.KANNode;
-    d3.select("#hovercard .type").text("Bias");
-    d3.select("#hovercard .value").text(node.bias.toFixed(2));
+    
+    // Create simple text display for bias
+    hovercard.append("div")
+      .style("padding", "10px")
+      .style("font-size", "14px")
+      .html(`<strong>Bias:</strong> ${node.bias.toFixed(2)}`);
+      
   } else if (type === HoverType.WEIGHT) {
     let edge = nodeOrEdge as nn_kan.KANEdge;
-    d3.select("#hovercard .type").text("Learnable Function");
-    let normWeight = Math.sqrt(edge.learnableFunction.controlPoints.reduce((sum, coeff) => sum + coeff * coeff, 0));
-    d3.select("#hovercard .value").text(`Norm: ${normWeight.toFixed(2)}`);
+    
+    // Create extended SplineChart for learnable function
+    let splineContainer = hovercard.append("div")
+      .style("padding", "5px");
+    
+    hoverCardSplineChart = new SplineChart(splineContainer, {
+      width: 300,
+      height: 200,
+      title: "",
+      showControlPoints: true,
+      showOldControlPaths: false,
+      showKnots: false,
+      showGrid: true,
+      showXAxisLabels: true,
+      showYAxisLabels: true,
+      showXAxisValues: true,
+      showYAxisValues: true,
+      showBorder: false
+    });
+    
+    // Update with the learnable function and track the current edge
+    hoverCardSplineChart.updateFunction(edge.learnableFunction);
+    currentHoverCardEdge = edge;
   }
 }
 

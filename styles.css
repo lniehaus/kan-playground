@@ -362,12 +362,23 @@ header h1 .optional {
   cursor: default;
   border-radius: 5px;
   left: 240px;
-  width: 150px;
+  width: auto;
+  min-width: 150px;
+  max-width: 320px;
   top: -20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
 #hovercard input {
   width: 60px;
+}
+
+#hovercard .spline-chart-wrapper {
+  display: inline-block;
+}
+
+#hovercard svg {
+  display: block;
 }
 
 /* Main Part*/
