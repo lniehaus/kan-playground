@@ -54,6 +54,7 @@ const BIAS_SIZE = 5;
 const NUM_SAMPLES_CLASSIFY = 500;
 const NUM_SAMPLES_REGRESS = 1200;
 const DENSITY = 100;
+const SPLINE_CHART_SIZE = 30;
 
 enum HoverType {
   BIAS, WEIGHT
@@ -181,6 +182,7 @@ let lineChart = new AppendingLineChart(d3.select("#linechart"),
     ["#777", "black"]);
 // Add spline chart variable
 let splineChart: SplineChart = null;
+let edgeSplineCharts: {[edgeId: string]: SplineChart} = {};
 
 function makeGUI() {
   d3.select("#reset-button").on("click", () => {
@@ -421,13 +423,29 @@ function updateWeightsUI(network: nn_kan.KANNode[][], container) {
         let edge = node.inputEdges[j];
         // Get average spline value for visualization
         let avgWeight = edge.learnableFunction.controlPoints.reduce((a, b) => a + b, 0) / edge.learnableFunction.controlPoints.length;
-        container.select(`#link${edge.sourceNode.id}-${edge.destNode.id}`)
+        
+        let edgeId = `${edge.sourceNode.id}-${edge.destNode.id}`;
+        
+        // Update the first link (source to spline chart)
+        container.select(`#link${edgeId}-part1`)
             .style({
               "stroke-dashoffset": -iter / 3,
               "stroke-width": linkWidthScale(Math.abs(avgWeight)),
               "stroke": colorScale(avgWeight)
-            })
-            .datum(edge);
+            });
+            
+        // Update the second link (spline chart to destination)
+        container.select(`#link${edgeId}-part2`)
+            .style({
+              "stroke-dashoffset": -iter / 3,
+              "stroke-width": linkWidthScale(Math.abs(avgWeight)),
+              "stroke": colorScale(avgWeight)
+            });
+            
+        // Update the spline chart
+        if (edgeSplineCharts[edgeId]) {
+          edgeSplineCharts[edgeId].updateFunction(edge.learnableFunction);
+        }
       }
     }
   }
@@ -555,6 +573,10 @@ function drawNetwork(network: nn_kan.KANNode[][]): void {
   // Remove all div elements.
   d3.select("#network").selectAll("div.canvas").remove();
   d3.select("#network").selectAll("div.plus-minus-neurons").remove();
+  d3.select("#network").selectAll("div.spline-chart").remove();
+
+  // Clear edge spline charts
+  edgeSplineCharts = {};
 
   // Initialize or recreate the spline chart in the output column
   initializeSplineChart();
@@ -578,7 +600,6 @@ function drawNetwork(network: nn_kan.KANNode[][]): void {
       .domain(d3.range(1, numLayers - 1))
       .rangePoints([featureWidth, width - RECT_SIZE], 0.7);
   let nodeIndexScale = (nodeIndex: number) => nodeIndex * (RECT_SIZE + 25);
-
 
   let calloutThumb = d3.select(".callout.thumbnail").style("display", "none");
   let calloutWeights = d3.select(".callout.weights").style("display", "none");
@@ -620,30 +641,6 @@ function drawNetwork(network: nn_kan.KANNode[][]): void {
         });
         idWithCallout = node.id;
       }
-
-      // Draw edges.
-      for (let j = 0; j < node.inputEdges.length; j++) {
-        let edge = node.inputEdges[j];
-        let path: SVGPathElement = drawLink(edge, node2coord, network,
-            container, j === 0, j, node.inputEdges.length).node() as any;
-        // Show callout to weights.
-        let prevLayer = network[layerIdx - 1];
-        let lastNodePrevLayer = prevLayer[prevLayer.length - 1];
-        if (targetIdWithCallout == null &&
-            i === numNodes - 1 &&
-            edge.sourceNode.id === lastNodePrevLayer.id &&
-            (edge.sourceNode.id !== idWithCallout || numLayers <= 5) &&
-            edge.destNode.id !== idWithCallout &&
-            prevLayer.length >= numNodes) {
-          let midPoint = path.getPointAtLength(path.getTotalLength() * 0.7);
-          calloutWeights.style({
-            display: null,
-            top: `${midPoint.y + 5}px`,
-            left: `${midPoint.x + 3}px`
-          });
-          targetIdWithCallout = edge.destNode.id;
-        }
-      }
     }
   }
 
@@ -652,12 +649,52 @@ function drawNetwork(network: nn_kan.KANNode[][]): void {
   let node = network[numLayers - 1][0];
   let cy = nodeIndexScale(0) + RECT_SIZE / 2;
   node2coord[node.id] = {cx, cy};
-  // Draw edges.
-  for (let i = 0; i < node.inputEdges.length; i++) {
-    let edge = node.inputEdges[i];
-    drawLink(edge, node2coord, network, container, i === 0, i,
-        node.inputEdges.length);
+
+  // Now draw all edges with spline charts
+  for (let layerIdx = 1; layerIdx < numLayers; layerIdx++) {
+    let currentLayer = network[layerIdx];
+    for (let nodeIdx = 0; nodeIdx < currentLayer.length; nodeIdx++) {
+      let node = currentLayer[nodeIdx];
+      
+      // Calculate vertical spacing for spline charts when multiple edges connect to the same node
+      let edgeSpacing = node.inputEdges.length > 1 ? 40 : 0;
+      let startOffset = -(node.inputEdges.length - 1) * edgeSpacing / 2;
+      
+      for (let edgeIdx = 0; edgeIdx < node.inputEdges.length; edgeIdx++) {
+        let edge = node.inputEdges[edgeIdx];
+        let verticalOffset = startOffset + edgeIdx * edgeSpacing;
+        
+        drawLinkWithSplineChart(edge, node2coord, network, container, 
+                              edgeIdx === 0, edgeIdx, node.inputEdges.length, verticalOffset);
+        
+        // Show callout to weights for the last edge of the last node in certain conditions
+        if (targetIdWithCallout == null &&
+            nodeIdx === currentLayer.length - 1 &&
+            edgeIdx === node.inputEdges.length - 1) {
+          let prevLayer = network[layerIdx - 1];
+          let lastNodePrevLayer = prevLayer[prevLayer.length - 1];
+          if (edge.sourceNode.id === lastNodePrevLayer.id &&
+              (edge.sourceNode.id !== idWithCallout || numLayers <= 5) &&
+              edge.destNode.id !== idWithCallout &&
+              prevLayer.length >= currentLayer.length) {
+            // Position callout at the spline chart location
+            let source = node2coord[edge.sourceNode.id];
+            let dest = node2coord[edge.destNode.id];
+            let midX = (source.cx + dest.cx) / 2;
+            let midY = dest.cy + verticalOffset;
+            
+            calloutWeights.style({
+              display: null,
+              top: `${midY + 5}px`,
+              left: `${midX + 3}px`
+            });
+            targetIdWithCallout = edge.destNode.id;
+          }
+        }
+      }
+    }
   }
+
   // Adjust the height of the svg.
   svg.attr("height", maxY);
 
@@ -810,6 +847,121 @@ function drawLink(
   return line;
 }
 
+function drawLinkWithSplineChart(
+    edge: nn_kan.KANEdge, node2coord: {[id: string]: {cx: number, cy: number}},
+    network: nn_kan.KANNode[][], container,
+    isFirst: boolean, index: number, length: number, verticalOffset: number = 0) {
+  
+  let source = node2coord[edge.sourceNode.id];
+  let dest = node2coord[edge.destNode.id];
+  let edgeId = `${edge.sourceNode.id}-${edge.destNode.id}`;
+  
+  // Calculate spline chart position (midpoint between source and destination)
+  let splineX = (source.cx + dest.cx) / 2;
+  let splineY = dest.cy + verticalOffset;
+  
+  // Create spline chart div
+  let splineDiv = d3.select("#network").append("div")
+    .attr("class", "spline-chart")
+    .attr("id", `spline-${edgeId}`)
+    .style({
+      position: "absolute",
+      left: `${splineX - SPLINE_CHART_SIZE / 2}px`,
+      top: `${splineY - SPLINE_CHART_SIZE / 2}px`,
+      width: `${SPLINE_CHART_SIZE}px`,
+      height: `${SPLINE_CHART_SIZE}px`,
+      "z-index": "10"
+    });
+
+  // Create spline chart
+  let splineChart = new SplineChart(splineDiv, {
+    width: SPLINE_CHART_SIZE,
+    height: SPLINE_CHART_SIZE,
+    title: "",
+    showControlPoints: false,
+    showKnots: false,
+    showGrid: false,
+    showXAxisLabels: false,
+    showYAxisLabels: false,
+    showXAxisValues: false,
+    showYAxisValues: false,
+    showBorder: true
+  });
+
+  // Store the spline chart for updates
+  edgeSplineCharts[edgeId] = splineChart;
+  
+  // Update spline chart with the learnable function
+  splineChart.updateFunction(edge.learnableFunction);
+
+  // Add hover functionality to spline chart
+  splineDiv.on("mouseenter", function() {
+    updateHoverCard(HoverType.WEIGHT, edge, [splineX, splineY]);
+  }).on("mouseleave", function() {
+    updateHoverCard(null);
+  });
+
+  // Draw first link: source node to spline chart
+  let line1 = container.insert("path", ":first-child");
+  let datum1 = {
+    source: {
+      y: source.cx + RECT_SIZE / 2 + 2,
+      x: source.cy
+    },
+    target: {
+      y: splineX - SPLINE_CHART_SIZE / 2,
+      x: splineY
+    }
+  };
+  let diagonal = d3.svg.diagonal().projection(d => [d.y, d.x]);
+  line1.attr({
+    "marker-start": "url(#markerArrow)",
+    class: "link",
+    id: `link${edgeId}-part1`,
+    d: diagonal(datum1, 0)
+  });
+
+  // Draw second link: spline chart to destination node
+  let line2 = container.insert("path", ":first-child");
+  let datum2 = {
+    source: {
+      y: splineX + SPLINE_CHART_SIZE / 2,
+      x: splineY
+    },
+    target: {
+      y: dest.cx - RECT_SIZE / 2,
+      x: dest.cy + ((index - (length - 1) / 2) / length) * 12
+    }
+  };
+  line2.attr({
+    "marker-start": "url(#markerArrow)",
+    class: "link",
+    id: `link${edgeId}-part2`,
+    d: diagonal(datum2, 0)
+  });
+
+  // Add invisible thick links for hover detection
+  container.append("path")
+    .attr("d", diagonal(datum1, 0))
+    .attr("class", "link-hover")
+    .on("mouseenter", function() {
+      updateHoverCard(HoverType.WEIGHT, edge, d3.mouse(this));
+    }).on("mouseleave", function() {
+      updateHoverCard(null);
+    });
+
+  container.append("path")
+    .attr("d", diagonal(datum2, 0))
+    .attr("class", "link-hover")
+    .on("mouseenter", function() {
+      updateHoverCard(HoverType.WEIGHT, edge, d3.mouse(this));
+    }).on("mouseleave", function() {
+      updateHoverCard(null);
+    });
+
+  return [line1, line2];
+}
+
 /**
  * Given a KAN network, it asks the network for the output (prediction)
  * of every node in the network using inputs sampled on a square grid.
@@ -898,8 +1050,8 @@ function initializeSplineChart() {
 
   // Create the spline chart
   splineChart = new SplineChart(splineContainer, {
-    width: 30,
-    height: 30,
+    width: SPLINE_CHART_SIZE,
+    height: SPLINE_CHART_SIZE,
     title: "",
     showControlPoints: false,
     showKnots: false,
@@ -938,6 +1090,27 @@ function updateSplineChart() {
   // Update the chart with the first function
   if (firstFunction) {
     splineChart.updateFunction(firstFunction);
+  }
+
+  // Update all edge spline charts
+  for (let edgeId in edgeSplineCharts) {
+    // Find the corresponding edge
+    let found = false;
+    outerLoop2: for (let layerIdx = 1; layerIdx < network.length; layerIdx++) {
+      const currentLayer = network[layerIdx];
+      for (let nodeIdx = 0; nodeIdx < currentLayer.length; nodeIdx++) {
+        const node = currentLayer[nodeIdx];
+        for (let edgeIdx = 0; edgeIdx < node.inputEdges.length; edgeIdx++) {
+          const edge = node.inputEdges[edgeIdx];
+          const currentEdgeId = `${edge.sourceNode.id}-${edge.destNode.id}`;
+          if (currentEdgeId === edgeId) {
+            edgeSplineCharts[edgeId].updateFunction(edge.learnableFunction);
+            found = true;
+            break outerLoop2;
+          }
+        }
+      }
+    }
   }
 }
 
