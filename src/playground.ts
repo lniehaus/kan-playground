@@ -1454,7 +1454,7 @@ function addPlusMinusControl(x: number, layerIdx: number) {
     .classed("plus-minus-neurons", true)
     .style({
       position: "absolute",
-      left: `${x}px`,
+      left: `${x - 15}px`, // Horizontally center the control
       top: "-60px"  // Move higher to avoid overlap with heatmaps
     });
 
