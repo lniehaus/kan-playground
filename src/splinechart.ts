@@ -472,8 +472,8 @@ export class SplineChart {
       .attr("cx", (d: any) => this.xScale(d.x))
       .attr("cy", (d: any) => this.yScale(d.y))
       .attr("r", 4)
-      .style("fill", "#FF5722")
-      .style("stroke", "#D84315")
+      .style("fill", "#E67E22")
+      .style("stroke", "#D35400")
       .style("stroke-width", 2)
       .append("title")
       .text((d: any) => `Control Point ${d.index}\nPosition: (${d.x.toFixed(2)}, ${d.y.toFixed(3)})`);
@@ -496,7 +496,7 @@ export class SplineChart {
         .attr("class", polygonClass)
         .attr("d", controlLine)
         .style("fill", "none")
-        .style("stroke", "#FF5722")
+        .style("stroke", "#E67E22")
         .style("stroke-width", 1)
         .style("stroke-dasharray", "5,5")
         .style("opacity", this.settings.showOldControlPaths ? 0.3 : 0.5);

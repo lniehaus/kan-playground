@@ -174,11 +174,7 @@ let colorScale = d3.scale.linear<string, number>()
 
 let linkColorScale = d3.scale.linear<string, number>()
                      .domain([-1, 0, 1])
-                     //.range(["#f59322", "#e8eaeb", "#0877bd"])
-                     //.range(["#f59322", "#e8eaeb", "#1B998B"])
-                     //.range(["#f59322", "#e8eaeb", "#7D2E68"])
-                     //.range(["#ffffff", "#e8eaeb", "#5A5A5A"])
-                     .range(["#ffffff", "#e8eaeb", "#6B6B6B"])
+                     .range(["#ffffff", "#e8eaeb", "#6B6B6B"]) // #1B998B #7D2E68 #5A5A5A
                      .clamp(true);
 
 let iter = 0;
@@ -840,7 +836,7 @@ function drawLinkWithSplineChart(
     .attr("id", `spline-${edgeId}`)
     .style({
       position: "absolute",
-      left: `${splineX - SPLINE_CHART_SIZE / 2}px`,
+      left: `${splineX - SPLINE_CHART_SIZE / 2 + 1}px`,
       top: `${splineY - SPLINE_CHART_SIZE / 2}px`,
       width: `${SPLINE_CHART_SIZE}px`,
       height: `${SPLINE_CHART_SIZE}px`,
