@@ -1389,7 +1389,7 @@ function addPlusMinusControl(x: number, layerIdx: number) {
 
   let suffix = state.networkShape[i] > 1 ? "s" : "";
   firstRow.append("span").text(
-    state.networkShape[i] + " neuron" + suffix
+    state.networkShape[i] + " Node" + suffix
   );
 }
 
