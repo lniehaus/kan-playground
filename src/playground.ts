@@ -578,6 +578,18 @@ function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
 
 }
 
+function getMaxLearnableFunctions(network: kan.KANNode[][]): number {
+  let maxSum = 0;
+  for (let layerIdx = 1; layerIdx < network.length; layerIdx++) {
+    let currentLayer = network[layerIdx];
+    let sum = currentLayer.reduce((acc, node) => acc + node.inputEdges.length, 0);
+    if (sum > maxSum) {
+      maxSum = sum;
+    }
+  }
+  return maxSum;
+}
+
 // Draw network
 function drawNetwork(network: kan.KANNode[][]): void {
   let svg = d3.select("#svg");
@@ -610,6 +622,8 @@ function drawNetwork(network: kan.KANNode[][]): void {
       .domain(d3.range(1, numLayers - 1))
       .rangePoints([featureWidth, width - RECT_SIZE], 0.7);
   let nodeIndexScale = (nodeIndex: number) => nodeIndex * (RECT_SIZE + 25);
+  // Inline function to get the maximum number of LearnableFunctions between KANEdges in the network
+
 
   let calloutThumb = d3.select(".callout.thumbnail").style("display", "none");
   let calloutWeights = d3.select(".callout.weights").style("display", "none");
@@ -619,7 +633,9 @@ function drawNetwork(network: kan.KANNode[][]): void {
   // Draw the input layer separately.
   let cx = RECT_SIZE / 2 + 50;
   let nodeIds = Object.keys(INPUTS);
-  let maxY = nodeIndexScale(nodeIds.length);
+  //let maxY = nodeIndexScale(nodeIds.length)
+  let maxY = nodeIndexScale(getMaxLearnableFunctions(network));
+  
   nodeIds.forEach((nodeId, i) => {
     let cy = nodeIndexScale(i) + RECT_SIZE / 2;
     node2coord[nodeId] = {cx, cy};
