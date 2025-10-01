@@ -21,7 +21,6 @@ import {
   State,
   datasets,
   regDatasets,
-  activations,
   problems,
   getKeyFromValue,
   Problem
@@ -81,7 +80,6 @@ let HIDABLE_CONTROLS = [
   ["Step button", "stepButton"],
   ["Reset button", "resetButton"],
   ["Learning rate", "learningRate"],
-  ["Activation", "activation"],
   ["Problem type", "problem"],
   ["Which dataset", "dataset"],
   ["Ratio train data", "percTrainData"],
@@ -336,14 +334,6 @@ function makeGUI() {
   });
   batchSize.property("value", state.batchSize);
   d3.select("label[for='batchSize'] .value").text(state.batchSize);
-
-  let activationDropdown = d3.select("#activations").on("change", function() {
-    state.activation = activations[this.value];
-    parametersChanged = true;
-    reset();
-  });
-  activationDropdown.property("value",
-      getKeyFromValue(activations, state.activation));
 
   let problemDropdown = d3.select("#problem").on("change", function() {
     state.problem = problems[this.value];
