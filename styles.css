@@ -481,11 +481,11 @@ g.column rect {
   dominant-baseline: auto;
 }
 
-#heatmap .tick:nth-child(7) text {
+#heatmap .tick:nth-child(6) text {
   fill: #333;
 }
 
-#heatmap .tick:nth-child(7) line {
+#heatmap .tick:nth-child(6) line {
   stroke: #999;
 }
 
