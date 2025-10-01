@@ -48,7 +48,7 @@ export class HeatMap {
       userSettings?: HeatMapSettings) {
     this.numSamples = numSamples;
     let height = width;
-    let padding = userSettings.showAxes ? 20 : 0;
+    let padding = userSettings.showAxes ? 30 : 0;
 
     if (userSettings != null) {
       // overwrite the defaults with the user-specified settings.
