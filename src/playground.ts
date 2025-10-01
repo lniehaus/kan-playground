@@ -348,6 +348,18 @@ function makeGUI() {
   activationDropdown.property("value",
       getKeyFromValue(activations, state.activation));
 
+  let problemDropdown = d3.select("#problem").on("change", function() {
+    state.problem = problems[this.value];
+    state.serialize();
+    userHasInteracted();
+    parametersChanged = true;
+    generateData();
+    drawDatasetThumbnails();
+    reset();
+  });
+  problemDropdown.property("value",
+      getKeyFromValue(problems, state.problem));
+
   let learningRate = d3.select("#learningRate").on("change", function() {
     state.learningRate = +this.value;
     state.serialize();
