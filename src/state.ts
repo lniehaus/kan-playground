@@ -13,8 +13,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-import * as nn from "./nn";
-import * as kan from "./kan";
 import * as dataset from "./dataset";
 
 /** Suffix added to the state when storing if a control is hidden or not. */

@@ -13,7 +13,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-import * as nn from "./nn";
 import * as kan from "./kan";
 import {HeatMap, reduceMatrix} from "./heatmap";
 import {SplineChart} from "./splinechart";
@@ -975,7 +974,7 @@ function getLoss(network: kan.KANNode[][], dataPoints: Example2D[]): number {
     let dataPoint = dataPoints[i];
     let input = constructInput(dataPoint.x, dataPoint.y);
     let output = kan.kanForwardProp(network, input);
-    loss += nn.Errors.SQUARE.error(output, dataPoint.label);
+    loss += kan.Errors.SQUARE.error(output, dataPoint.label);
   }
   return loss / dataPoints.length;
 }
@@ -1043,7 +1042,7 @@ function oneStep(): void {
   trainData.forEach((point, i) => {
     let input = constructInput(point.x, point.y);
     kan.kanForwardProp(network, input);
-    kan.kanBackProp(network, point.label, nn.Errors.SQUARE);
+    kan.kanBackProp(network, point.label, kan.Errors.SQUARE);
     if ((i + 1) % state.batchSize === 0) {
       kan.updateKANWeights(network, state.learningRate);
     }

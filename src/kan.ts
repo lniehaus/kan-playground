@@ -14,6 +14,23 @@ limitations under the License.
 ==============================================================================*/
 
 /**
+ * An error function and its derivative.
+ */
+export interface ErrorFunction {
+  error: (output: number, target: number) => number;
+  der: (output: number, target: number) => number;
+}
+
+/** Built-in error functions */
+export class Errors {
+  public static SQUARE: ErrorFunction = {
+    error: (output: number, target: number) =>
+               0.5 * Math.pow(output - target, 2),
+    der: (output: number, target: number) => output - target
+  };
+}
+
+/**
  * A learnable univariate function represented as a B-spline.
  * This is the core component of a KAN (Kolmogorov-Arnold Network).
  */
@@ -396,7 +413,7 @@ export function kanForwardProp(network: KANNode[][], inputs: number[]): number {
 export function kanBackProp(
   network: KANNode[][],
   target: number,
-  errorFunc: { der: (output: number, target: number) => number }
+  errorFunc: ErrorFunction
 ): void {
   // Initialize output gradient
   const outputNode = network[network.length - 1][0];
