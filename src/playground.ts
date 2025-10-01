@@ -23,7 +23,6 @@ import {
   regDatasets,
   activations,
   problems,
-  regularizations,
   getKeyFromValue,
   Problem
 } from "./state";
@@ -83,8 +82,6 @@ let HIDABLE_CONTROLS = [
   ["Reset button", "resetButton"],
   ["Learning rate", "learningRate"],
   ["Activation", "activation"],
-  ["Regularization", "regularization"],
-  ["Regularization rate", "regularizationRate"],
   ["Problem type", "problem"],
   ["Which dataset", "dataset"],
   ["Ratio train data", "percTrainData"],

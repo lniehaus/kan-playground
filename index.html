@@ -107,33 +107,6 @@ limitations under the License.
           </select>
         </div>
       </div>
-      <div class="control ui-regularization">
-        <label for="regularizations">Regularization</label>
-        <div class="select">
-          <select id="regularizations">
-            <option value="none">None</option>
-            <option value="L1">L1</option>
-            <option value="L2">L2</option>
-          </select>
-        </div>
-      </div>
-      <div class="control ui-regularizationRate">
-        <label for="regularRate">Regularization rate</label>
-        <div class="select">
-          <select id="regularRate">
-            <option value="0">0</option>
-            <option value="0.001">0.001</option>
-            <option value="0.003">0.003</option>
-            <option value="0.01">0.01</option>
-            <option value="0.03">0.03</option>
-            <option value="0.1">0.1</option>
-            <option value="0.3">0.3</option>
-            <option value="1">1</option>
-            <option value="3">3</option>
-            <option value="10">10</option>
-          </select>
-        </div>
-      </div>
       <div class="control ui-problem">
         <label for="problem">Problem type</label>
         <div class="select">
@@ -380,7 +353,6 @@ limitations under the License.
       <h2>What Are the Key Parameters?</h2>
       <p><b>Grid Size:</b> This controls the number of control points in each B-spline function. Higher values allow more complex functions but increase computational cost and may lead to overfitting.</p>
       <p><b>Learning Rate:</b> How fast the network learns. KANs may require different learning rates than traditional MLPs.</p>
-      <p><b>Regularization:</b> Helps prevent overfitting by penalizing complex function shapes.</p>
     </div>
 
     <div class="l--body">
