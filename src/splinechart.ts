@@ -14,7 +14,7 @@ limitations under the License.
 ==============================================================================*/
 
 import * as d3 from 'd3';
-import { LearnableFunction } from './nn_kan';
+import { LearnableFunction } from './kan';
 
 export interface SplineChartSettings {
   [key: string]: any;
@@ -442,9 +442,7 @@ export class SplineChart {
       .attr("class", "spline-curve")
       .attr("d", line)
       .style("fill", "none")
-      //.style("stroke", "#2196F3")
       .style("stroke", "#1B998B")
-      //.style("stroke", "#7D2E68")
       .style("stroke-width", 3)
       .style("stroke-linecap", "round");
   }

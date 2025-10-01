@@ -14,7 +14,7 @@ limitations under the License.
 ==============================================================================*/
 
 import * as nn from "./nn";
-import * as nn_kan from "./nn_kan";
+import * as kan from "./kan";
 import * as dataset from "./dataset";
 
 /** Suffix added to the state when storing if a control is hidden or not. */

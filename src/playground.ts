@@ -14,9 +14,9 @@ limitations under the License.
 ==============================================================================*/
 
 import * as nn from "./nn";
-import * as nn_kan from "./nn_kan";
+import * as kan from "./kan";
 import {HeatMap, reduceMatrix} from "./heatmap";
-import {SplineChart} from "./splinechart"; // Add this import
+import {SplineChart} from "./splinechart";
 import {
   State,
   datasets,
@@ -180,7 +180,7 @@ let linkColorScale = d3.scale.linear<string, number>()
 let iter = 0;
 let trainData: Example2D[] = [];
 let testData: Example2D[] = [];
-let network: nn_kan.KANNode[][] = null;
+let network: kan.KANNode[][] = null;
 let lossTrain = 0;
 let lossTest = 0;
 let player = new Player();
@@ -192,7 +192,7 @@ let edgeSplineCharts: {[edgeId: string]: SplineChart} = {};
 // Hover card spline chart
 let hoverCardSplineChart: SplineChart = null;
 // Current edge being displayed in hover card
-let currentHoverCardEdge: nn_kan.KANEdge = null;
+let currentHoverCardEdge: kan.KANEdge = null;
 
 function makeGUI() {
   d3.select("#reset-button").on("click", () => {
@@ -416,13 +416,13 @@ function makeGUI() {
   }
 }
 
-function updateBiasesUI(network: nn_kan.KANNode[][]) {
-  nn_kan.forEachKANNode(network, true, node => {
+function updateBiasesUI(network: kan.KANNode[][]) {
+  kan.forEachKANNode(network, true, node => {
     d3.select(`rect#bias-${node.id}`).style("fill", colorScale(node.bias));
   });
 }
 
-function updateWeightsUI(network: nn_kan.KANNode[][], container) {
+function updateWeightsUI(network: kan.KANNode[][], container) {
   for (let layerIdx = 1; layerIdx < network.length; layerIdx++) {
     let currentLayer = network[layerIdx];
     // Update all the nodes in this layer.
@@ -467,7 +467,7 @@ function updateWeightsUI(network: nn_kan.KANNode[][], container) {
 }
 
 function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
-    container, node?: nn_kan.KANNode) {
+    container, node?: kan.KANNode) {
   let x = cx - RECT_SIZE / 2;
   let y = cy - RECT_SIZE / 2;
 
@@ -560,7 +560,7 @@ function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
       div.classed("hovered", false);
       nodeGroup.classed("hovered", false);
       updateDecisionBoundary(network, false);
-      heatMap.updateBackground(boundary[nn_kan.getKANOutputNode(network).id],
+      heatMap.updateBackground(boundary[kan.getKANOutputNode(network).id],
           state.discretize);
     });
   if (isInput) {
@@ -581,7 +581,7 @@ function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
 }
 
 // Draw network
-function drawNetwork(network: nn_kan.KANNode[][]): void {
+function drawNetwork(network: kan.KANNode[][]): void {
   let svg = d3.select("#svg");
   // Remove all svg elements.
   svg.select("g.core").remove();
@@ -716,7 +716,7 @@ function drawNetwork(network: nn_kan.KANNode[][]): void {
 }
 
 function calculateGlobalSplinePositions(
-  network: nn_kan.KANNode[][], 
+  network: kan.KANNode[][], 
   layerIdx: number, 
   node2coord: {[id: string]: {cx: number, cy: number}}
 ): {[edgeKey: string]: {x: number, y: number}} {
@@ -733,7 +733,7 @@ function calculateGlobalSplinePositions(
   console.log(`SVG Height: ${svgHeight}, MinY: ${minY}, MaxY: ${maxY}`);
   
   // Collect all edges for this layer and sort them by source node position, then destination node position
-  let allEdges: {edge: nn_kan.KANEdge, sourceY: number, destY: number, edgeKey: string}[] = [];
+  let allEdges: {edge: kan.KANEdge, sourceY: number, destY: number, edgeKey: string}[] = [];
   
   let currentLayer = network[layerIdx];
   for (let nodeIdx = 0; nodeIdx < currentLayer.length; nodeIdx++) {
@@ -798,8 +798,8 @@ function calculateGlobalSplinePositions(
 }
 
 function drawLinkWithSplineChart(
-    edge: nn_kan.KANEdge, node2coord: {[id: string]: {cx: number, cy: number}},
-    network: nn_kan.KANNode[][], container,
+    edge: kan.KANEdge, node2coord: {[id: string]: {cx: number, cy: number}},
+    network: kan.KANNode[][], container,
     isFirst: boolean, index: number, length: number, 
     splinePosition: {x: number, y: number}) {
   
@@ -926,10 +926,10 @@ function drawLinkWithSplineChart(
  * It returns a map where each key is the node ID and the value is a square
  * matrix of the outputs of the network for each input in the grid respectively.
  */
-function updateDecisionBoundary(network: nn_kan.KANNode[][], firstTime: boolean) {
+function updateDecisionBoundary(network: kan.KANNode[][], firstTime: boolean) {
   if (firstTime) {
     boundary = {};
-    nn_kan.forEachKANNode(network, true, node => {
+    kan.forEachKANNode(network, true, node => {
       boundary[node.id] = new Array(DENSITY);
     });
     // Go through all predefined inputs.
@@ -943,7 +943,7 @@ function updateDecisionBoundary(network: nn_kan.KANNode[][], firstTime: boolean)
   let i = 0, j = 0;
   for (i = 0; i < DENSITY; i++) {
     if (firstTime) {
-      nn_kan.forEachKANNode(network, true, node => {
+      kan.forEachKANNode(network, true, node => {
         boundary[node.id][i] = new Array(DENSITY);
       });
       // Go through all predefined inputs.
@@ -956,8 +956,8 @@ function updateDecisionBoundary(network: nn_kan.KANNode[][], firstTime: boolean)
       let x = xScale(i);
       let y = yScale(j);
       let input = constructInput(x, y);
-      nn_kan.kanForwardProp(network, input);
-      nn_kan.forEachKANNode(network, true, node => {
+      kan.kanForwardProp(network, input);
+      kan.forEachKANNode(network, true, node => {
         boundary[node.id][i][j] = node.output;
       });
       if (firstTime) {
@@ -970,12 +970,12 @@ function updateDecisionBoundary(network: nn_kan.KANNode[][], firstTime: boolean)
   }
 }
 
-function getLoss(network: nn_kan.KANNode[][], dataPoints: Example2D[]): number {
+function getLoss(network: kan.KANNode[][], dataPoints: Example2D[]): number {
   let loss = 0;
   for (let i = 0; i < dataPoints.length; i++) {
     let dataPoint = dataPoints[i];
     let input = constructInput(dataPoint.x, dataPoint.y);
-    let output = nn_kan.kanForwardProp(network, input);
+    let output = kan.kanForwardProp(network, input);
     loss += nn.Errors.SQUARE.error(output, dataPoint.label);
   }
   return loss / dataPoints.length;
@@ -989,7 +989,7 @@ function updateUI(firstStep = false) {
   // Get the decision boundary of the network.
   updateDecisionBoundary(network, firstStep);
   let selectedId = selectedNodeId != null ?
-      selectedNodeId : nn_kan.getKANOutputNode(network).id;
+      selectedNodeId : kan.getKANOutputNode(network).id;
   heatMap.updateBackground(boundary[selectedId], state.discretize);
 
   // Update all decision boundaries.
@@ -1043,10 +1043,10 @@ function oneStep(): void {
   iter++;
   trainData.forEach((point, i) => {
     let input = constructInput(point.x, point.y);
-    nn_kan.kanForwardProp(network, input);
-    nn_kan.kanBackProp(network, point.label, nn.Errors.SQUARE);
+    kan.kanForwardProp(network, input);
+    kan.kanBackProp(network, point.label, nn.Errors.SQUARE);
     if ((i + 1) % state.batchSize === 0) {
-      nn_kan.updateKANWeights(network, state.learningRate);
+      kan.updateKANWeights(network, state.learningRate);
     }
   });
   // Compute the loss.
@@ -1055,7 +1055,7 @@ function oneStep(): void {
   updateUI();
 }
 
-export function getOutputWeights(network: nn_kan.KANNode[][]): number[] {
+export function getOutputWeights(network: kan.KANNode[][]): number[] {
   let weights: number[] = [];
   for (let layerIdx = 0; layerIdx < network.length - 1; layerIdx++) {
     let currentLayer = network[layerIdx];
@@ -1090,7 +1090,7 @@ function reset(onStartup=false) {
   let shape = [numInputs].concat(state.networkShape).concat([1]);
   
   // Updated to include initNoise parameter
-  network = nn_kan.buildKANNetwork(shape, constructInputIds(), state.gridSize, state.degree, state.initNoise, false);
+  network = kan.buildKANNetwork(shape, constructInputIds(), state.gridSize, state.degree, state.initNoise, false);
   lossTrain = getLoss(network, trainData);
   lossTest = getLoss(network, testData);
   drawNetwork(network);
@@ -1247,7 +1247,7 @@ function simulationStarted() {
   parametersChanged = false;
 }
 
-function updateHoverCard(type: HoverType, nodeOrEdge?: nn_kan.KANNode | nn_kan.KANEdge, coordinates?: number[]) {
+function updateHoverCard(type: HoverType, nodeOrEdge?: kan.KANNode | kan.KANEdge, coordinates?: number[]) {
   let hovercard = d3.select("#hovercard");
   
   if (type == null) {
@@ -1312,7 +1312,7 @@ function updateHoverCard(type: HoverType, nodeOrEdge?: nn_kan.KANNode | nn_kan.K
   hovercard.selectAll("*").remove();
   
   if (type === HoverType.BIAS) {
-    let node = nodeOrEdge as nn_kan.KANNode;
+    let node = nodeOrEdge as kan.KANNode;
     
     // Create simple text display for bias
     hovercard.append("div")
@@ -1321,7 +1321,7 @@ function updateHoverCard(type: HoverType, nodeOrEdge?: nn_kan.KANNode | nn_kan.K
       .html(`<strong>Bias:</strong> ${node.bias.toFixed(2)}`);
       
   } else if (type === HoverType.WEIGHT) {
-    let edge = nodeOrEdge as nn_kan.KANEdge;
+    let edge = nodeOrEdge as kan.KANEdge;
     
     // Create extended SplineChart for learnable function
     let splineContainer = hovercard.append("div")
