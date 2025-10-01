@@ -398,7 +398,6 @@ function makeGUI() {
     .call(xAxis);
 
   // Listen for css-responsive changes and redraw the svg network.
-
   window.addEventListener("resize", () => {
     let newWidth = document.querySelector("#main-part")
         .getBoundingClientRect().width;
@@ -593,9 +592,6 @@ function drawNetwork(network: nn_kan.KANNode[][]): void {
 
   // Clear edge spline charts
   edgeSplineCharts = {};
-
-  // Initialize or recreate the spline chart in the output column
-  // initializeSplineChart(); // Removed - First Learnable Function chart
 
   // Get the width of the svg container.
   let padding = 3;
@@ -985,100 +981,6 @@ function getLoss(network: nn_kan.KANNode[][], dataPoints: Example2D[]): number {
   return loss / dataPoints.length;
 }
 
-/* Removed - First Learnable Function chart
-function initializeSplineChart() {
-  // Clear any existing spline chart
-  d3.select("#spline-chart-container").remove();
-  
-  // Create container in the output column
-  let outputColumn = d3.select(".column.output");
-  let splineContainer = outputColumn.append("div")
-    .attr("id", "spline-chart-container")
-    .style({
-      "margin-top": "20px",
-      "margin-bottom": "20px",
-      "padding": "10px",
-      "background": "white"
-    });
-
-  // Add a title
-  splineContainer.append("h3")
-    .style({
-      "margin": "0 0 10px 0",
-      "font-size": "14px",
-      "font-weight": "bold",
-      "text-align": "center"
-    })
-    .text("First Learnable Function");
-
-  // Create the spline chart
-  splineChart = new SplineChart(splineContainer, {
-    width: 300,
-    height: 200,
-    title: "",
-    showControlPoints: true,
-    showOldControlPaths: false,
-    showKnots: false,
-    showGrid: true,
-    showXAxisLabels: true,
-    showYAxisLabels: true,
-    showXAxisValues: true,
-    showYAxisValues: true,
-    showBorder: true
-  });
-
-  // Update with the first learnable function if network exists
-  updateSplineChart();
-}
-
-function updateSplineChart() {
-  if (!splineChart || !network) {
-    return;
-  }
-
-  // Find the first learnable function in the network
-  let firstFunction: nn_kan.LearnableFunction = null;
-  
-  // Look for the first edge with a learnable function
-  outerLoop: for (let layerIdx = 1; layerIdx < network.length; layerIdx++) {
-    const currentLayer = network[layerIdx];
-    for (let nodeIdx = 0; nodeIdx < currentLayer.length; nodeIdx++) {
-      const node = currentLayer[nodeIdx];
-      if (node.inputEdges.length > 0) {
-        firstFunction = node.inputEdges[0].learnableFunction;
-        break outerLoop;
-      }
-    }
-  }
-
-  // Update the chart with the first function
-  if (firstFunction) {
-    splineChart.updateFunction(firstFunction);
-  }
-
-  // Update all edge spline charts
-  for (let edgeId in edgeSplineCharts) {
-    // Find the corresponding edge
-    let found = false;
-    outerLoop2: for (let layerIdx = 1; layerIdx < network.length; layerIdx++) {
-      const currentLayer = network[layerIdx];
-      for (let nodeIdx = 0; nodeIdx < currentLayer.length; nodeIdx++) {
-        const node = currentLayer[nodeIdx];
-        for (let edgeIdx = 0; edgeIdx < node.inputEdges.length; edgeIdx++) {
-          const edge = node.inputEdges[edgeIdx];
-          const currentEdgeId = `${edge.sourceNode.id}-${edge.destNode.id}`;
-          if (currentEdgeId === edgeId) {
-            edgeSplineCharts[edgeId].updateFunction(edge.learnableFunction);
-            found = true;
-            break outerLoop2;
-          }
-        }
-      }
-    }
-  }
-}
-*/
-
 function updateUI(firstStep = false) {
   // Update the links visually.
   updateWeightsUI(network, d3.select("g.core"));
@@ -1089,9 +991,6 @@ function updateUI(firstStep = false) {
   let selectedId = selectedNodeId != null ?
       selectedNodeId : nn_kan.getKANOutputNode(network).id;
   heatMap.updateBackground(boundary[selectedId], state.discretize);
-
-  // Update spline chart
-  // updateSplineChart(); // Removed - First Learnable Function chart
 
   // Update all decision boundaries.
   d3.select("#network").selectAll("div.canvas")
