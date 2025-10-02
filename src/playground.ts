@@ -745,12 +745,13 @@ function calculateGlobalSplinePositions(
     }
   }
   
-  // Sort edges by source node Y position first, then by destination node Y position
+  // Sort edges by destination node Y position first, then by source node Y position
+  // This groups edges going to the same destination node together
   allEdges.sort((a, b) => {
-    if (a.sourceY !== b.sourceY) {
-      return a.sourceY - b.sourceY;
+    if (a.destY !== b.destY) {
+      return a.destY - b.destY;
     }
-    return a.destY - b.destY;
+    return a.sourceY - b.sourceY;
   });
   
   // Calculate spacing (compress if necessary)
