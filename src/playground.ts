@@ -47,14 +47,13 @@ function scrollTween(offset) {
 }
 
 const RECT_SIZE = 30;
-const BIAS_SIZE = 5;
 const NUM_SAMPLES_CLASSIFY = 500;
 const NUM_SAMPLES_REGRESS = 1200;
 const DENSITY = 100;
 const SPLINE_CHART_SIZE = 30;
 
 enum HoverType {
-  BIAS, WEIGHT
+  WEIGHT
 }
 
 interface InputFeature {
@@ -414,12 +413,6 @@ function makeGUI() {
   }
 }
 
-function updateBiasesUI(network: kan.KANNode[][]) {
-  kan.forEachKANNode(network, true, node => {
-    d3.select(`rect#bias-${node.id}`).style("fill", colorScale(node.bias));
-  });
-}
-
 function updateWeightsUI(network: kan.KANNode[][], container) {
   for (let layerIdx = 1; layerIdx < network.length; layerIdx++) {
     let currentLayer = network[layerIdx];
@@ -518,21 +511,6 @@ function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
       text.append("tspan").text(label);
     }
     nodeGroup.classed(activeOrNotClass, true);
-  }
-  if (!isInput) {
-    // Draw the node's bias.
-    nodeGroup.append("rect")
-      .attr({
-        id: `bias-${nodeId}`,
-        x: -BIAS_SIZE - 2,
-        y: RECT_SIZE - BIAS_SIZE + 3,
-        width: BIAS_SIZE,
-        height: BIAS_SIZE,
-      }).on("mouseenter", function() {
-        updateHoverCard(HoverType.BIAS, node, d3.mouse(container.node()));
-      }).on("mouseleave", function() {
-        updateHoverCard(null);
-      });
   }
 
   // Draw the node's canvas.
@@ -998,8 +976,6 @@ function getLoss(network: kan.KANNode[][], dataPoints: Example2D[]): number {
 function updateUI(firstStep = false) {
   // Update the links visually.
   updateWeightsUI(network, d3.select("g.core"));
-  // Update the bias values visually.
-  updateBiasesUI(network);
   // Get the decision boundary of the network.
   updateDecisionBoundary(network, firstStep);
   let selectedId = selectedNodeId != null ?
@@ -1104,7 +1080,7 @@ function reset(onStartup=false) {
   let shape = [numInputs].concat(state.networkShape).concat([1]);
   
   // Updated to include initNoise parameter
-  network = kan.buildKANNetwork(shape, constructInputIds(), state.gridSize, state.degree, state.initNoise, false);
+  network = kan.buildKANNetwork(shape, constructInputIds(), state.gridSize, state.degree, state.initNoise);
   lossTrain = getLoss(network, trainData);
   lossTest = getLoss(network, testData);
   drawNetwork(network);
@@ -1279,41 +1255,26 @@ function updateHoverCard(type: HoverType, nodeOrEdge?: kan.KANNode | kan.KANEdge
   // Position the hover card below the spline chart
   let finalX, finalY;
   
-  if (type === HoverType.WEIGHT) {
-    // For weight hover cards, position below the spline chart
-    // Center the hover card horizontally relative to the spline chart
-    finalX = coordinates[0] - 150; // Center 300px hover card around spline chart
-    finalY = coordinates[1] + (SPLINE_CHART_SIZE / 2) + 10; // Position below spline chart with 10px gap
-    
-    // Ensure hover card stays within viewport bounds
-    // Prevent going off left edge
-    if (finalX < 10) {
-      finalX = 10;
-    }
-    
-    // Prevent going off right edge (300px hover card width + padding)
-    if (finalX + 310 > window.innerWidth) {
-      finalX = window.innerWidth - 310;
-    }
-    
-    // Prevent going off bottom edge (200px hover card height + padding)
-    if (finalY + 210 > window.innerHeight) {
-      // If no room below, position above the spline chart
-      finalY = coordinates[1] - (SPLINE_CHART_SIZE / 2) - 210;
-    }
-    
-  } else {
-    // For bias hover cards, use simple offset positioning
-    finalX = coordinates[0] + 15;
-    finalY = coordinates[1] - 10;
-    
-    // Basic boundary checking for bias cards
-    if (finalX + 160 > window.innerWidth) {
-      finalX = coordinates[0] - 160;
-    }
-    if (finalY < 10) {
-      finalY = coordinates[1] + 15;
-    }
+  // For weight hover cards, position below the spline chart
+  // Center the hover card horizontally relative to the spline chart
+  finalX = coordinates[0] - 150; // Center 300px hover card around spline chart
+  finalY = coordinates[1] + (SPLINE_CHART_SIZE / 2) + 10; // Position below spline chart with 10px gap
+  
+  // Ensure hover card stays within viewport bounds
+  // Prevent going off left edge
+  if (finalX < 10) {
+    finalX = 10;
+  }
+  
+  // Prevent going off right edge (300px hover card width + padding)
+  if (finalX + 310 > window.innerWidth) {
+    finalX = window.innerWidth - 310;
+  }
+  
+  // Prevent going off bottom edge (200px hover card height + padding)
+  if (finalY + 210 > window.innerHeight) {
+    // If no room below, position above the spline chart
+    finalY = coordinates[1] - (SPLINE_CHART_SIZE / 2) - 210;
   }
   
   hovercard.style({
@@ -1325,16 +1286,7 @@ function updateHoverCard(type: HoverType, nodeOrEdge?: kan.KANNode | kan.KANEdge
   // Clear existing content
   hovercard.selectAll("*").remove();
   
-  if (type === HoverType.BIAS) {
-    let node = nodeOrEdge as kan.KANNode;
-    
-    // Create simple text display for bias
-    hovercard.append("div")
-      .style("padding", "10px")
-      .style("font-size", "14px")
-      .html(`<strong>Bias:</strong> ${node.bias.toFixed(2)}`);
-      
-  } else if (type === HoverType.WEIGHT) {
+  if (type === HoverType.WEIGHT) {
     let edge = nodeOrEdge as kan.KANEdge;
     
     // Create extended SplineChart for learnable function

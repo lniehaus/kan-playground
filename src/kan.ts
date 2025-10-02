@@ -305,19 +305,14 @@ export class KANNode {
   output: number = 0;
   /** Error derivative with respect to this node's output */
   outputDer: number = 0;
-  /** Bias term (optional, can be disabled for pure KAN) */
-  bias: number = 0;
 
-  constructor(id: string, useBias: boolean = false) {
+  constructor(id: string) {
     this.id = id;
-    if (useBias) {
-      this.bias = (Math.random() - 0.5) * 0.1;
-    }
   }
 
   /** Forward pass: sum all edge outputs */
   forward(): number {
-    this.output = this.bias;
+    this.output = 0;
     for (const edge of this.inputEdges) {
       this.output += edge.forward(edge.sourceNode.output);
     }
@@ -342,8 +337,7 @@ export function buildKANNetwork(
   inputIds: string[],
   gridSize: number = 5,
   degree: number = 3,
-  initNoise: number = 0.3,
-  useBias: boolean = false
+  initNoise: number = 0.3
 ): KANNode[][] {
   const numLayers = networkShape.length;
   let nodeId = 1;
@@ -360,7 +354,7 @@ export function buildKANNetwork(
       const id = isInputLayer ? inputIds[i] : nodeId.toString();
       if (!isInputLayer) nodeId++;
       
-      const node = new KANNode(id, useBias && !isInputLayer);
+      const node = new KANNode(id);
       currentLayer.push(node);
     }
   }
@@ -445,11 +439,6 @@ export function updateKANWeights(network: KANNode[][], learningRate: number): vo
   for (let layerIdx = 1; layerIdx < network.length; layerIdx++) {
     const currentLayer = network[layerIdx];
     for (const node of currentLayer) {
-      // Update bias if used
-      if (node.bias !== 0) {
-        node.bias -= learningRate * node.outputDer;
-      }
-      
       // Update edge parameters
       for (const edge of node.inputEdges) {
         edge.updateParameters(learningRate);
