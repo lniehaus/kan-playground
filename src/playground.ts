@@ -1294,10 +1294,11 @@ function updateHoverCard(type: HoverType, nodeOrEdge?: kan.KANNode | kan.KANEdge
     let splineContainer = hovercard.append("div")
       .style("padding", "5px");
     
+    let edgeId = `${edge.sourceNode.id}-${edge.destNode.id}`;
     hoverCardSplineChart = new SplineChart(splineContainer, {
       width: 300,
       height: 200,
-      title: "",
+      title: edgeId,
       showControlPoints: true,
       showOldControlPaths: false,
       showKnots: false,
