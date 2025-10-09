@@ -600,8 +600,21 @@ function drawNetwork(network: kan.KANNode[][]): void {
       .domain(d3.range(1, numLayers - 1))
       .rangePoints([featureWidth, width - RECT_SIZE], 0.7);
   let nodeIndexScale = (nodeIndex: number) => nodeIndex * (RECT_SIZE + 25);
-  // Inline function to get the maximum number of LearnableFunctions between KANEdges in the network
-
+  
+  // Calculate maxY before drawing anything
+  let nodeIds = Object.keys(INPUTS);
+  let maxLearnableFunctions = getMaxLearnableFunctions(network);
+  console.log(maxLearnableFunctions);
+  let maxY = nodeIndexScale(maxLearnableFunctions);
+  
+  // Also consider the size of intermediate layers
+  for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
+    let numNodes = network[layerIdx].length;
+    maxY = Math.max(maxY, nodeIndexScale(numNodes));
+  }
+  
+  // Set SVG height early based on calculated maxY
+  svg.attr("height", maxY);
 
   let calloutThumb = d3.select(".callout.thumbnail").style("display", "none");
   let calloutWeights = d3.select(".callout.weights").style("display", "none");
@@ -610,10 +623,7 @@ function drawNetwork(network: kan.KANNode[][]): void {
 
   // Draw the input layer separately.
   let cx = RECT_SIZE / 2 + 50;
-  let nodeIds = Object.keys(INPUTS);
-  //let maxY = nodeIndexScale(nodeIds.length)
-  let maxY = nodeIndexScale(getMaxLearnableFunctions(network));
-  
+
   nodeIds.forEach((nodeId, i) => {
     let cy = nodeIndexScale(i) + RECT_SIZE / 2;
     node2coord[nodeId] = {cx, cy};
@@ -624,7 +634,6 @@ function drawNetwork(network: kan.KANNode[][]): void {
   for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
     let numNodes = network[layerIdx].length;
     let cx = layerScale(layerIdx) + RECT_SIZE / 2;
-    maxY = Math.max(maxY, nodeIndexScale(numNodes));
     addPlusMinusControl(layerScale(layerIdx), layerIdx);
     for (let i = 0; i < numNodes; i++) {
       let node = network[layerIdx][i];
@@ -695,8 +704,6 @@ function drawNetwork(network: kan.KANNode[][]): void {
     }
   }
 
-  // Adjust the height of the svg.
-  svg.attr("height", maxY);
 
   // Adjust the height of the features column.
   let height = Math.max(
