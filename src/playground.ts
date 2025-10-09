@@ -599,14 +599,14 @@ function drawNetwork(network: kan.KANNode[][]): void {
   let layerScale = d3.scale.ordinal<number, number>()
       .domain(d3.range(1, numLayers - 1))
       .rangePoints([featureWidth, width - RECT_SIZE], 0.7);
+  let splineIndexScale = (nodeIndex: number) => nodeIndex * (RECT_SIZE + 10);
   let nodeIndexScale = (nodeIndex: number) => nodeIndex * (RECT_SIZE + 25);
   
   // Calculate maxY before drawing anything
   let nodeIds = Object.keys(INPUTS);
   let maxLearnableFunctions = getMaxLearnableFunctions(network);
-  console.log(maxLearnableFunctions);
-  let maxY = nodeIndexScale(maxLearnableFunctions);
-  
+  let maxY = splineIndexScale(maxLearnableFunctions);
+
   // Also consider the size of intermediate layers
   for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
     let numNodes = network[layerIdx].length;
@@ -729,8 +729,7 @@ function calculateGlobalSplinePositions(
   let padding = 3;
   let minY = padding + SPLINE_CHART_SIZE / 2 + VERTICAL_BUFFER;
   let maxY = svgHeight - padding - SPLINE_CHART_SIZE / 2 - VERTICAL_BUFFER;
-  console.log(`SVG Height: ${svgHeight}, MinY: ${minY}, MaxY: ${maxY}`);
-  
+
   // Collect all edges for this layer and sort them by source node position, then destination node position
   let allEdges: {edge: kan.KANEdge, sourceY: number, destY: number, edgeKey: string}[] = [];
   
