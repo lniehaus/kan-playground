@@ -893,8 +893,8 @@ footer {
 footer svg {
   margin-top: 2px;
   float: left;
-  width: 110px;
-  height: 18px;
+  width: 187px; /* 110px; */
+  height: 40px; /* 18px; */
   fill: #aaa;
 }
 
