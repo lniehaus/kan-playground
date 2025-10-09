@@ -887,22 +887,22 @@ footer {
   color: #ccc;
   font-weight: 300;
   padding: 40px 0;
-  height: 30px;
+  height: 40px;
 }
 
 footer svg {
-  margin-top: 2px;
   float: left;
-  width: 187px; /* 110px; */
-  height: 40px; /* 18px; */
-  fill: #aaa;
+  width: auto;
+  height: 36px;
+  padding: 2px 2px 2px 2px;
+  background:#dc3545;
 }
 
 footer .links {
   float: right;
   font-size: 13px;
-  height: 30px;
-  line-height: 30px;
+  height: 40px;
+  line-height: 40px;
   margin-left: 20px;
 }
 
