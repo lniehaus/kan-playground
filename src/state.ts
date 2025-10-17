@@ -131,8 +131,8 @@ export class State {
   collectStats = false;
   numHiddenLayers = 1;
   hiddenLayerControls: any[] = [];
-  networkShape: number[] = [3];
-  gridSize = 5; // KAN grid size for spline functions
+  networkShape: number[] = [1];
+  gridSize = 3; // KAN grid size for spline functions
   degree = 3;   // KAN B-spline degree (1=linear, 3=cubic, etc.)
   initNoise = 0.3; // KAN initial control point noise (0=zero init, higher=more random)
   x = true;

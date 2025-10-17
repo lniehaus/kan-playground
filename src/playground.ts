@@ -613,6 +613,7 @@ function drawNetwork(network: kan.KANNode[][]): void {
     maxY = Math.max(maxY, nodeIndexScale(numNodes));
   }
   
+  maxY = Math.max(maxY, 400);
   // Set SVG height early based on calculated maxY
   svg.attr("height", maxY);
 
