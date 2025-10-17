@@ -157,8 +157,8 @@ let heatMap =
     new HeatMap(300, DENSITY, xDomain, xDomain, d3.select("#heatmap"),
         {showAxes: true});
 let linkWidthScale = d3.scale.linear()
-  .domain([0, 5])
-  .range([1, 10])
+  .domain([0, 1])
+  .range([0, 5]) // 0, 10
   .clamp(true);
 let colorScale = d3.scale.linear<string, number>()
                      .domain([-1, 0, 1])
@@ -416,30 +416,49 @@ function makeGUI() {
 function updateWeightsUI(network: kan.KANNode[][], container) {
   for (let layerIdx = 1; layerIdx < network.length; layerIdx++) {
     let currentLayer = network[layerIdx];
-    // Update all the nodes in this layer.
+    
+    // First pass: calculate all norms for this layer and find the maximum
+    let layerNorms: {[edgeId: string]: number} = {};
+    let maxNorm = 0;
+    
     for (let i = 0; i < currentLayer.length; i++) {
       let node = currentLayer[i];
       for (let j = 0; j < node.inputEdges.length; j++) {
         let edge = node.inputEdges[j];
-        // Get norm of spline coefficients for visualization
         let normWeight = Math.sqrt(edge.learnableFunction.controlPoints.reduce((sum, coeff) => sum + coeff * coeff, 0));
-        
         let edgeId = `${edge.sourceNode.id}-${edge.destNode.id}`;
+        layerNorms[edgeId] = normWeight;
+        maxNorm = Math.max(maxNorm, normWeight);
+      }
+    }
+    
+    // Avoid division by zero
+    if (maxNorm === 0) {
+      maxNorm = 1;
+    }
+    
+    // Second pass: update all the visual elements with normalized weights
+    for (let i = 0; i < currentLayer.length; i++) {
+      let node = currentLayer[i];
+      for (let j = 0; j < node.inputEdges.length; j++) {
+        let edge = node.inputEdges[j];
+        let edgeId = `${edge.sourceNode.id}-${edge.destNode.id}`;
+        let normalizedWeight = layerNorms[edgeId] / maxNorm;
         
         // Update the first link (source to spline chart)
         container.select(`#link${edgeId}-part1`)
             .style({
               "stroke-dashoffset": -iter / 3,
-              "stroke-width": linkWidthScale(normWeight),
-              "stroke": linkColorScale(normWeight)
+              "stroke-width": linkWidthScale(normalizedWeight),
+              "stroke": linkColorScale(normalizedWeight)
             });
             
         // Update the second link (spline chart to destination)
         container.select(`#link${edgeId}-part2`)
             .style({
               "stroke-dashoffset": -iter / 3,
-              "stroke-width": linkWidthScale(normWeight),
-              "stroke": linkColorScale(normWeight)
+              "stroke-width": linkWidthScale(normalizedWeight),
+              "stroke": linkColorScale(normalizedWeight)
             });
             
         // Update the spline chart
