@@ -52,34 +52,32 @@ const NUM_SAMPLES_REGRESS = 1200;
 const DENSITY = 100;
 const SPLINE_CHART_SIZE = 30;
 
-// Helper: populate gridSize options based on degree
-function updateGridSizeOptionsForDegree(degreeVal: number, currentGridSize?: number) {
-  // minGrid follows B-spline rule: number of control points >= degree + 1
-  const minGrid = Math.max(2, Math.floor(degreeVal) + 1);
-  const maxGrid = 20; // adjust if you want a different upper bound
+// Helper: populate numControlPoints options based on degree
+function updateNumControlPointsOptionsForDegree(degreeVal: number, currentNumControlPoints?: number) {
+  // B-spline rule: number of control points >= degree + 1
+  const minControlPoints = Math.max(2, Math.floor(degreeVal) + 2);
+  const maxControlPoints = 20;
 
-  // Ensure values are sorted ascending
-  const values: number[] = d3.range(minGrid, maxGrid + 1).sort((a: number, b: number) => a - b);
-  const gridSel = d3.select("#gridSize");
+  const values: number[] = d3.range(minControlPoints, maxControlPoints + 1).sort((a: number, b: number) => a - b);
+  const cpSel = d3.select("#numControlPoints");
 
-  // Bind options
-  const opts = gridSel.selectAll("option").data(values, (d: any) => d);
+  const opts = cpSel.selectAll("option").data(values, (d: any) => d);
   opts.enter()
     .append("option")
     .attr("value", (d: any) => d)
-    .text((d: any) => d+1);
+    .text((d: any) => d);
   opts.exit().remove();
 
-  // Enforce DOM order matching sorted data
-  gridSel.selectAll("option").sort((a: number, b: number) => a - b);
+  // enforce DOM order
+  cpSel.selectAll("option").sort((a: number, b: number) => a - b);
 
   // Ensure a valid selection
-  const desired = currentGridSize != null ? Math.max(minGrid, currentGridSize) : minGrid;
-  gridSel.property("value", desired);
+  const desired = currentNumControlPoints != null ? Math.max(minControlPoints, currentNumControlPoints) : minControlPoints;
+  cpSel.property("value", desired);
 
-  // If we changed the value programmatically, dispatch change so the app reacts.
-  const el = gridSel.node() as HTMLSelectElement;
-  const effectiveCurrent = (currentGridSize != null ? currentGridSize : minGrid);
+  // If changed programmatically, dispatch change so the app reacts.
+  const el = cpSel.node() as HTMLSelectElement;
+  const effectiveCurrent = (currentNumControlPoints != null ? currentNumControlPoints : minControlPoints);
   if (el && +el.value !== effectiveCurrent) {
     const evt = new Event("change", { bubbles: true });
     el.dispatchEvent(evt);
@@ -118,7 +116,7 @@ let HIDABLE_CONTROLS = [
   ["Noise level", "noise"],
   ["Batch size", "batchSize"],
   ["# of hidden layers", "numHiddenLayers"],
-  ["Grid size", "gridSize"],
+  ["Control points", "numControlPoints"],
   ["Spline degree", "degree"],
   ["Init noise", "initNoise"], 
 ];
@@ -175,6 +173,13 @@ class Player {
 }
 
 let state = State.deserializeState();
+
+// // Backward-compat: migrate gridSize -> numControlPoints if needed
+// if ((state as any).numControlPoints == null) {
+//   const gs = (state as any).gridSize != null ? Math.floor((state as any).gridSize) : 5;
+//   const deg = Math.floor((state as any).degree != null ? (state as any).degree : 3);
+//   (state as any).numControlPoints = Math.max(gs + 1, deg + 1);
+// }
 
 // Filter out inputs that are hidden.
 state.getHiddenProps().forEach(prop => {
@@ -384,18 +389,19 @@ function makeGUI() {
     state.serialize();
     userHasInteracted();
     parametersChanged = true;
-    // reset(); not needed, changes take effect immediately and can be used as manual learning rate scheduler
+    // reset(); not needed
   });
   learningRate.property("value", state.learningRate);
 
-  let gridSize = d3.select("#gridSize").on("change", function() {
-    state.gridSize = +this.value;
+  // numControlPoints UI
+  let numControlPointsSel = d3.select("#numControlPoints").on("change", function() {
+    state.numControlPoints = +this.value;
     state.serialize();
     userHasInteracted();
     parametersChanged = true;
     reset();
   });
-  gridSize.property("value", state.gridSize);
+  numControlPointsSel.property("value", state.numControlPoints);
 
   let degree = d3.select("#degree").on("change", function() {
     state.degree = +this.value;
@@ -406,14 +412,14 @@ function makeGUI() {
   });
   degree.property("value", state.degree);
 
-  // Initialize gridSize options based on current degree and gridSize
-  updateGridSizeOptionsForDegree(+degree.property("value"), state.gridSize);
+  // Initialize numControlPoints options based on current degree and selection
+  updateNumControlPointsOptionsForDegree(+degree.property("value"), state.numControlPoints);
 
-  // Keep gridSize options in sync when degree changes (namespaced listener so we don't override your handler)
+  // Keep options in sync when degree changes
   d3.select("#degree").on("change.gridOptions", function() {
     const degVal = +(this as HTMLSelectElement).value;
-    const currentGrid = +d3.select("#gridSize").property("value") || state.gridSize;
-    updateGridSizeOptionsForDegree(degVal, currentGrid);
+    const currentCP = +d3.select("#numControlPoints").property("value") || state.numControlPoints;
+    updateNumControlPointsOptionsForDegree(degVal, currentCP);
   });
 
   // Add initNoise control
@@ -1149,9 +1155,11 @@ function reset(onStartup=false) {
   iter = 0;
   let numInputs = constructInput(0 , 0).length;
   let shape = [numInputs].concat(state.networkShape).concat([1]);
-  
-  // Updated to include initNoise parameter
-  network = kan.buildKANNetwork(shape, constructInputIds(), state.gridSize, state.degree, state.initNoise);
+
+  // Derive gridSize from numControlPoints
+  const derivedGridSize = Math.max(1, Math.floor(state.numControlPoints) - 1);
+
+  network = kan.buildKANNetwork(shape, constructInputIds(), derivedGridSize, state.degree, state.initNoise);
   lossTrain = getLoss(network, trainData);
   lossTest = getLoss(network, testData);
   drawNetwork(network);
