@@ -52,6 +52,40 @@ const NUM_SAMPLES_REGRESS = 1200;
 const DENSITY = 100;
 const SPLINE_CHART_SIZE = 30;
 
+// Helper: populate gridSize options based on degree
+function updateGridSizeOptionsForDegree(degreeVal: number, currentGridSize?: number) {
+  // minGrid follows B-spline rule: number of control points >= degree + 1
+  const minGrid = Math.max(2, Math.floor(degreeVal) + 1);
+  const maxGrid = 20; // adjust if you want a different upper bound
+
+  // Ensure values are sorted ascending
+  const values: number[] = d3.range(minGrid, maxGrid + 1).sort((a: number, b: number) => a - b);
+  const gridSel = d3.select("#gridSize");
+
+  // Bind options
+  const opts = gridSel.selectAll("option").data(values, (d: any) => d);
+  opts.enter()
+    .append("option")
+    .attr("value", (d: any) => d)
+    .text((d: any) => d+1);
+  opts.exit().remove();
+
+  // Enforce DOM order matching sorted data
+  gridSel.selectAll("option").sort((a: number, b: number) => a - b);
+
+  // Ensure a valid selection
+  const desired = currentGridSize != null ? Math.max(minGrid, currentGridSize) : minGrid;
+  gridSel.property("value", desired);
+
+  // If we changed the value programmatically, dispatch change so the app reacts.
+  const el = gridSel.node() as HTMLSelectElement;
+  const effectiveCurrent = (currentGridSize != null ? currentGridSize : minGrid);
+  if (el && +el.value !== effectiveCurrent) {
+    const evt = new Event("change", { bubbles: true });
+    el.dispatchEvent(evt);
+  }
+}
+
 enum HoverType {
   WEIGHT
 }
@@ -371,6 +405,16 @@ function makeGUI() {
     reset();
   });
   degree.property("value", state.degree);
+
+  // Initialize gridSize options based on current degree and gridSize
+  updateGridSizeOptionsForDegree(+degree.property("value"), state.gridSize);
+
+  // Keep gridSize options in sync when degree changes (namespaced listener so we don't override your handler)
+  d3.select("#degree").on("change.gridOptions", function() {
+    const degVal = +(this as HTMLSelectElement).value;
+    const currentGrid = +d3.select("#gridSize").property("value") || state.gridSize;
+    updateGridSizeOptionsForDegree(degVal, currentGrid);
+  });
 
   // Add initNoise control
   let initNoise = d3.select("#initNoise").on("change", function() {
