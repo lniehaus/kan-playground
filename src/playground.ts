@@ -1378,9 +1378,11 @@ function updateHoverCard(type: HoverType, nodeOrEdge?: kan.KANNode | kan.KANEdge
     const lastLayer = network[network.length - 1];
     const lastNode = lastLayer && lastLayer.length ? lastLayer[lastLayer.length - 1] : null;
     const lastId = lastNode ? lastNode.id : "N/A";
+    const isDestOutput = edge.destNode.id === lastId;
+    const isSourceInput = INPUTS.hasOwnProperty(edge.sourceNode.id);
 
-    let leftText = edge.sourceNode.id;
-    let rightText = edge.destNode.id == lastId ? 'output' : edge.destNode.id;
+    let leftText = isSourceInput ? 'Input ' + edge.sourceNode.id : 'Node ' + edge.sourceNode.id;
+    let rightText = isDestOutput ? 'Output' : 'Node ' + edge.destNode.id;
 
     let edgeText = `${leftText} → ${rightText}`;
     
