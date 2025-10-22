@@ -114,7 +114,7 @@ export class State {
     {name: "hideText", type: Type.BOOLEAN},
     {name: "numControlPoints", type: Type.NUMBER}, // KAN number of control points parameter
     {name: "degree", type: Type.NUMBER},   // KAN B-spline degree parameter
-    {name: "initNoise", type: Type.NUMBER}, // KAN initial control point noise parameter
+    {name: "initNoise", type: Type.STRING}, // KAN initial control point noise parameter
   ];
 
   [key: string]: any;
@@ -134,7 +134,7 @@ export class State {
   networkShape: number[] = [1];
   numControlPoints = 5; // KAN number of control points for spline functions
   degree = 3;   // KAN B-spline degree (1=linear, 3=cubic, etc.)
-  initNoise = 0.3; // KAN initial control point noise (0=zero init, higher=more random)
+  initNoise: number | "xavier" | "kaiming" | "lecun" = 0.3; // Allow strategies
   x = true;
   y = true;
   xTimesY = false;
@@ -157,7 +157,7 @@ export class State {
       let [name, value] = keyvalue.split("=");
       map[name] = value;
     }
-    let state = new State();
+    const state = new State();
 
     function hasKey(name: string): boolean {
       return name in map && map[name] != null && map[name].trim() !== "";
@@ -219,6 +219,34 @@ export class State {
       state.seed = Math.random().toFixed(5);
     }
     Math.seedrandom(state.seed);
+
+    // Coercion helpers
+    const toNum = (v: any, fallback: number): number => {
+      const n = typeof v === "string" ? parseFloat(v) :
+                typeof v === "number" ? v : NaN;
+      return isNaN(n) ? fallback : n;
+    };
+    const toInt = (v: any, fallback: number): number =>
+      Math.floor(toNum(v, fallback));
+
+    // Coerce numeric fields
+    state.learningRate = toNum((state as any).learningRate, 0.03);
+    state.batchSize = Math.max(1, toInt((state as any).batchSize, 10));
+    state.percTrainData = Math.min(100, Math.max(0, toNum((state as any).percTrainData, 50)));
+    state.noise = Math.max(0, toNum((state as any).noise, 0));
+    state.degree = Math.max(1, toInt((state as any).degree, 3));
+    state.numControlPoints = Math.max(state.degree + 1, toInt((state as any).numControlPoints, 6));
+
+    // Init noise can be strategy or number
+    const rawInit = (state as any).initNoise;
+    if (rawInit === "xavier" || rawInit === "kaiming" || rawInit === "lecun") {
+      state.initNoise = rawInit;
+    } else {
+      const n = typeof rawInit === "string" ? parseFloat(rawInit) :
+                typeof rawInit === "number" ? rawInit : NaN;
+      state.initNoise = isNaN(n) ? 0.3 : n;
+    }
+
     return state;
   }
 
@@ -264,3 +292,32 @@ export class State {
     this[name + HIDE_STATE_SUFFIX] = hidden;
   }
 }
+
+// If you have a ParamSpec/PROP_SPECS list, keep initNoise as STRING:
+//   {name: "batchSize", type: Type.NUMBER},
+//   {name: "dataset", type: Type.OBJECT, keyMap: datasets},
+//   {name: "regDataset", type: Type.OBJECT, keyMap: regDatasets},
+//   {name: "learningRate", type: Type.NUMBER},
+//   {name: "noise", type: Type.NUMBER},
+//   {name: "networkShape", type: Type.ARRAY_NUMBER},
+//   {name: "seed", type: Type.STRING},
+//   {name: "showTestData", type: Type.BOOLEAN},
+//   {name: "discretize", type: Type.BOOLEAN},
+//   {name: "percTrainData", type: Type.NUMBER},
+//   {name: "x", type: Type.BOOLEAN},
+//   {name: "y", type: Type.BOOLEAN},
+//   {name: "xTimesY", type: Type.BOOLEAN},
+//   {name: "xSquared", type: Type.BOOLEAN},
+//   {name: "ySquared", type: Type.BOOLEAN},
+//   {name: "cosX", type: Type.BOOLEAN},
+//   {name: "sinX", type: Type.BOOLEAN},
+//   {name: "cosY", type: Type.BOOLEAN},
+//   {name: "sinY", type: Type.BOOLEAN},
+//   {name: "collectStats", type: Type.BOOLEAN},
+//   {name: "tutorial", type: Type.STRING},
+//   {name: "problem", type: Type.OBJECT, keyMap: problems},
+//   {name: "initZero", type: Type.BOOLEAN},
+//   {name: "hideText", type: Type.BOOLEAN},
+//   {name: "numControlPoints", type: Type.NUMBER}, // KAN number of control points parameter
+//   {name: "degree", type: Type.NUMBER},   // KAN B-spline degree parameter
+//   {name: "initNoise", type: Type.STRING}, // KAN initial control point noise parameter

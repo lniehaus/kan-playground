@@ -36,25 +36,31 @@ export class Errors {
  */
 export class LearnableFunction {
   id: string;
-  /** Control points for the B-spline */
   controlPoints: number[] = [];
-  /** Knot vector for the B-spline */
   knotVector: number[] = [];
-  /** Grid size (number of intervals) */
   gridSize: number;
-  /** B-spline degree */
   degree: number;
-  /** Initial noise for control point initialization */
-  initNoise: number;
-  /** Input range for normalization */
+  initNoise: number | "xavier" | "kaiming" | "lecun";
   inputRange: [number, number] = [-1, 1];
+  private fanIn: number;
+  private fanOut: number;
   
-  constructor(id: string, gridSize: number = 5, range: [number, number] = [-1, 1], degree: number = 3, initNoise: number = 0.3) {
+  constructor(
+    id: string,
+    gridSize: number = 5,
+    range: [number, number] = [-1, 1],
+    degree: number = 3,
+    initNoise: number | "xavier" | "kaiming" | "lecun" = 0.3,
+    fanIn: number = 1,
+    fanOut: number = 1
+  ) {
     this.id = id;
     this.gridSize = gridSize;
-    this.degree = Math.min(degree, gridSize - 1); // Degree cannot exceed gridSize - 1
+    this.degree = Math.min(degree, gridSize - 1);
     this.initNoise = initNoise;
     this.inputRange = range;
+    this.fanIn = Math.max(1, fanIn | 0);
+    this.fanOut = Math.max(1, fanOut | 0);
     this.initializeKnotVector();
     this.initializeControlPoints();
   }
@@ -63,6 +69,7 @@ export class LearnableFunction {
     const [min, max] = this.inputRange;
     const numControlPoints = this.gridSize + 1;
     const numKnots = numControlPoints + this.degree + 1;
+    console.log("numControlPoints", numControlPoints, "numKnots", numKnots);
     
     this.knotVector = [];
     
@@ -87,8 +94,30 @@ export class LearnableFunction {
   private initializeControlPoints(): void {
     const numControlPoints = this.gridSize + 1;
     this.controlPoints = [];
+
+    const randUniform = (a: number, b: number) => a + (b - a) * Math.random();
+
+    if (this.initNoise === "xavier" || this.initNoise === "kaiming" || this.initNoise === "lecun") {
+      // Xavier/Glorot: U(-sqrt(6/(fanIn+fanOut)), sqrt(6/(fanIn+fanOut)))
+      // Kaiming/He:    U(-sqrt(6/fanIn), sqrt(6/fanIn))
+      // LeCun:         U(-sqrt(3/fanIn), sqrt(3/fanIn))
+      const safeFanIn = Math.max(1, this.fanIn | 0);
+      const safeFanOut = Math.max(1, this.fanOut | 0);
+      const limit =
+        this.initNoise === "xavier" ? Math.sqrt(6 / (safeFanIn + safeFanOut)) :
+        this.initNoise === "kaiming" ? Math.sqrt(6 / safeFanIn) :
+        Math.sqrt(3 / safeFanIn); // lecun
+
+      for (let i = 0; i < numControlPoints; i++) {
+        this.controlPoints.push(randUniform(-limit, limit));
+      }
+      return;
+    }
+
+    // Default: small symmetric noise around 0.
+    const noise = typeof this.initNoise === "number" ? this.initNoise : 0.3;
     for (let i = 0; i < numControlPoints; i++) {
-      this.controlPoints.push((Math.random() - 0.5) * this.initNoise);
+      this.controlPoints.push((Math.random() - 0.5) * noise);
     }
   }
 
@@ -238,19 +267,26 @@ export class KANEdge {
   sourceNode: KANNode;
   destNode: KANNode;
   learnableFunction: LearnableFunction;
-  /** Cached input value for backpropagation */
   lastInput: number = 0;
-  /** Accumulated gradients */
   accGradients: number[] = [];
   numAccumulatedGrads: number = 0;
 
-  constructor(source: KANNode, dest: KANNode, gridSize: number = 5, degree: number = 3, initNoise: number = 0.3) {
+  constructor(
+    source: KANNode,
+    dest: KANNode,
+    gridSize: number = 5,
+    degree: number = 3,
+    initNoise: number | "xavier" | "kaiming" | "lecun" = 0.3,
+    fanIn: number = 1,
+    fanOut: number = 1
+  ) {
     this.id = source.id + "-" + dest.id;
     this.sourceNode = source;
     this.destNode = dest;
-    this.learnableFunction = new LearnableFunction(this.id, gridSize, [-1, 1], degree, initNoise);
+    this.learnableFunction = new LearnableFunction(
+      this.id, gridSize, [-1, 1], degree, initNoise, fanIn, fanOut
+    );
     
-    // Initialize accumulated gradients array
     const numControlPoints = gridSize + 1;
     this.accGradients = [];
     for (let i = 0; i < numControlPoints; i++) {
@@ -337,7 +373,7 @@ export function buildKANNetwork(
   inputIds: string[],
   gridSize: number = 5,
   degree: number = 3,
-  initNoise: number = 0.3
+  initNoise: number | "xavier" | "kaiming" | "lecun" = 0.3
 ): KANNode[][] {
   const numLayers = networkShape.length;
   let nodeId = 1;
@@ -348,12 +384,10 @@ export function buildKANNetwork(
     const isInputLayer = layerIdx === 0;
     const currentLayer: KANNode[] = [];
     network.push(currentLayer);
-    
     const numNodes = networkShape[layerIdx];
     for (let i = 0; i < numNodes; i++) {
       const id = isInputLayer ? inputIds[i] : nodeId.toString();
       if (!isInputLayer) nodeId++;
-      
       const node = new KANNode(id);
       currentLayer.push(node);
     }
@@ -363,10 +397,14 @@ export function buildKANNetwork(
   for (let layerIdx = 1; layerIdx < numLayers; layerIdx++) {
     const prevLayer = network[layerIdx - 1];
     const currentLayer = network[layerIdx];
-    
+    const fanIn = prevLayer.length;
+    const fanOut = (layerIdx < numLayers - 1) ? network[layerIdx + 1].length : 1;
+
     for (const destNode of currentLayer) {
       for (const sourceNode of prevLayer) {
-        const edge = new KANEdge(sourceNode, destNode, gridSize, degree, initNoise);
+        const edge = new KANEdge(
+          sourceNode, destNode, gridSize, degree, initNoise, fanIn, fanOut
+        );
         sourceNode.outputEdges.push(edge);
         destNode.inputEdges.push(edge);
       }
