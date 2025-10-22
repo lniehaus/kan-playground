@@ -90,14 +90,6 @@ limitations under the License.
           </select>
         </div>
       </div>
-      <div class="control ui-numControlPoints">
-        <label for="numControlPoints">Control Points</label>
-        <div class="select">
-          <select id="numControlPoints">
-            <!-- Options set dynamically in playground.ts based on degree -->
-          </select>
-        </div>
-      </div>
       <div class="control ui-degree">
         <label for="degree">Spline degree</label>
         <div class="select">
@@ -107,6 +99,14 @@ limitations under the License.
             <option value="3">3 (Cubic)</option>
             <option value="4">4 (Quartic)</option>
             <option value="5">5 (Quintic)</option>
+          </select>
+        </div>
+      </div>
+      <div class="control ui-numControlPoints">
+        <label for="numControlPoints">Control Points</label>
+        <div class="select">
+          <select id="numControlPoints">
+            <!-- Options set dynamically in playground.ts based on degree -->
           </select>
         </div>
       </div>
@@ -343,8 +343,8 @@ limitations under the License.
     <div class="l--body">
       <h2>What Are the Key Parameters?</h2>
       <p><b>Learning Rate:</b> Controls how fast the network learns during training. Higher values make the network learn faster but may cause instability or overshooting. Lower values provide more stable training but slower convergence. KANs may require different learning rates than traditional MLPs due to their unique spline-based architecture.</p>
-      <p><b>Grid Size:</b> Determines the number of control points in each B-spline function on the edges. Higher values (e.g., 15-20) allow the splines to learn more complex, detailed functions but increase computational cost and memory usage. Lower values (e.g., 3-5) create simpler, smoother functions that may be less prone to overfitting but might lack the capacity to capture complex patterns.</p>
       <p><b>Spline Degree:</b> Sets the polynomial degree of the B-spline basis functions. Linear (degree 1) creates piecewise linear functions, while higher degrees create smoother curves. Cubic splines (degree 3) are commonly used as they provide a good balance between smoothness and computational efficiency. Higher degrees can capture more complex patterns but may be more prone to overfitting.</p>
+      <p><b>Control Points:</b> Sets how many control points each B-spline function on an edge uses. More control points let the spline capture finer detail but increase compute and memory usage; fewer control points enforce smoother, simpler functions, which can regularize but may underfit complex patterns.</p>
       <p><b>Init Noise:</b> Controls the initial random values added to the spline coefficients at network initialization. Zero initialization starts with flat functions, while small noise (0.1-0.3) provides gentle random starting points. Larger noise values (0.8-1.0) create more varied initial functions, which can help break symmetry but may make training less stable.</p>     
       <p><b>Problem Type:</b> Determines the network's output configuration and loss function. Classification problems use categorical outputs with cross-entropy loss for predicting discrete classes (e.g., orange vs. blue points). Regression problems use continuous outputs with mean squared error loss for predicting continuous values (e.g., temperature, price).</p>
     </div>
