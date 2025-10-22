@@ -294,7 +294,7 @@ function makeGUI() {
     if (state.numHiddenLayers >= 5) {
       return;
     }
-    state.networkShape[state.numHiddenLayers] = 2;
+    state.networkShape[state.numHiddenLayers] = 1;
     state.numHiddenLayers++;
     parametersChanged = true;
     reset();
