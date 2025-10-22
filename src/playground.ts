@@ -1372,11 +1372,22 @@ function updateHoverCard(type: HoverType, nodeOrEdge?: kan.KANNode | kan.KANEdge
     let splineContainer = hovercard.append("div")
       .style("padding", "5px");
     
-    let edgeId = `${edge.sourceNode.id}-${edge.destNode.id}`;
+    
+
+    // Get the last node id in the network (last layer, last node)
+    const lastLayer = network[network.length - 1];
+    const lastNode = lastLayer && lastLayer.length ? lastLayer[lastLayer.length - 1] : null;
+    const lastId = lastNode ? lastNode.id : "N/A";
+
+    let leftText = edge.sourceNode.id;
+    let rightText = edge.destNode.id == lastId ? 'output' : edge.destNode.id;
+
+    let edgeText = `${leftText} → ${rightText}`;
+    
     hoverCardSplineChart = new SplineChart(splineContainer, {
       width: 300,
       height: 200,
-      title: edgeId,
+      title: edgeText,
       showControlPoints: true,
       showOldControlPaths: false,
       showKnots: false,
