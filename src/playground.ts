@@ -424,25 +424,6 @@ function makeGUI() {
 
   // Add initNoise control
   const initNoiseSel = d3.select("#initNoise");
-  // if (initNoiseSel.selectAll("option").empty()) {
-  //   const opts: {value: string, label: string}[] =
-  //     { value: "xavier", label: "Xavier (Glorot)" },
-  //     { value: "kaiming", label: "Kaiming (He)" },
-  //     { value: "lecun",  label: "LeCun" },
-  //     { value: "0",   label: "0 (Zero init)" },
-  //     { value: "0.1", label: "0.1 (Very small)" },
-  //     { value: "0.3", label: "0.3 (Default)" },
-  //     { value: "0.5", label: "0.5 (Medium)" },
-  //     { value: "0.8", label: "0.8 (Large)" },
-  //     { value: "1.0", label: "1.0 (Very large)" },
-  //   ];
-  //   initNoiseSel.selectAll("option")
-  //     .data(opts)
-  //     .enter()
-  //     .append("option")
-  //     .attr("value", d => d.value)
-  //     .text(d => d.label);
-  // }
 
   let initNoise = initNoiseSel.on("change", function() {
     const raw = (this as HTMLSelectElement).value;
