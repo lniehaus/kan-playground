@@ -890,7 +890,7 @@ footer {
   height: 40px;
 }
 
-footer svg {
+footer .logo img {
   float: left;
   width: auto;
   height: 36px;
