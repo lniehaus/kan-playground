@@ -42,7 +42,7 @@ export class AppendingLineChart {
     let node = container.node() as HTMLElement;
     let totalWidth = node.offsetWidth;
     let totalHeight = node.offsetHeight;
-    let margin = {top: 2, right: 0, bottom: 2, left: 2};
+    let margin = { top: 2, right: 0, bottom: 2, left: 2 };
     let width = totalWidth - margin.left - margin.right;
     let height = totalHeight - margin.top - margin.bottom;
 
@@ -58,7 +58,7 @@ export class AppendingLineChart {
       .attr("width", width + margin.left + margin.right)
       .attr("height", height + margin.top + margin.bottom)
       .append("g")
-        .attr("transform", `translate(${margin.left},${margin.top})`);
+      .attr("transform", `translate(${margin.left},${margin.top})`);
 
     this.paths = new Array(this.numLines);
     for (let i = 0; i < this.numLines; i++) {
@@ -88,7 +88,7 @@ export class AppendingLineChart {
       this.maxY = Math.max(this.maxY, y);
     });
 
-    this.data.push({x: this.data.length + 1, y: dataPoint});
+    this.data.push({ x: this.data.length + 1, y: dataPoint });
     this.redraw();
   }
 
@@ -98,9 +98,9 @@ export class AppendingLineChart {
     this.yScale.domain([this.minY, this.maxY]);
     // Adjust all the <path> elements (lines).
     let getPathMap = (lineIndex: number) => {
-      return d3.svg.line<{x: number, y:number}>()
-      .x(d => this.xScale(d.x))
-      .y(d => this.yScale(d.y[lineIndex]));
+      return d3.svg.line<{ x: number, y: number }>()
+        .x(d => this.xScale(d.x))
+        .y(d => this.yScale(d.y[lineIndex]));
     };
     for (let i = 0; i < this.numLines; i++) {
       this.paths[i].datum(this.data).attr("d", getPathMap(i));

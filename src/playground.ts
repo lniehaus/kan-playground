@@ -14,8 +14,8 @@ limitations under the License.
 ==============================================================================*/
 
 import * as kan from "./kan";
-import {HeatMap, reduceMatrix} from "./heatmap";
-import {SplineChart} from "./splinechart";
+import { HeatMap, reduceMatrix } from "./heatmap";
+import { SplineChart } from "./splinechart";
 import {
   State,
   datasets,
@@ -24,14 +24,14 @@ import {
   getKeyFromValue,
   Problem
 } from "./state";
-import {Example2D, shuffle} from "./dataset";
-import {AppendingLineChart} from "./linechart";
+import { Example2D, shuffle, generateSymbolicDataset, SymbolicDatasetResult } from "./dataset";
+import { AppendingLineChart } from "./linechart";
 import * as d3 from 'd3';
 
 let mainWidth;
 
 // More scrolling
-d3.select(".more button").on("click", function() {
+d3.select(".more button").on("click", function () {
   let position = 800;
   d3.transition()
     .duration(1000)
@@ -39,18 +39,23 @@ d3.select(".more button").on("click", function() {
 });
 
 function scrollTween(offset) {
-  return function() {
+  return function () {
     let i = d3.interpolateNumber(window.pageYOffset ||
-        document.documentElement.scrollTop, offset);
-    return function(t) { scrollTo(0, i(t)); };
+      document.documentElement.scrollTop, offset);
+    return function (t) { scrollTo(0, i(t)); };
   };
 }
 
 const RECT_SIZE = 30;
 const NUM_SAMPLES_CLASSIFY = 500;
 const NUM_SAMPLES_REGRESS = 1200;
+const NUM_SAMPLES_SYMBOLIC = 800;
 const DENSITY = 100;
 const SPLINE_CHART_SIZE = 30;
+const SYMBOLIC_PREVIEW_SAMPLES = 200;
+const SYMBOLIC_ALLOWED_INPUTS: { [key: string]: boolean } = {
+  "x": true
+};
 
 // Helper: populate numControlPoints options based on degree
 function updateNumControlPointsOptionsForDegree(degreeVal: number, currentNumControlPoints?: number) {
@@ -93,14 +98,14 @@ interface InputFeature {
   label?: string;
 }
 
-let INPUTS: {[name: string]: InputFeature} = {
-  "x": {f: (x, y) => x, label: "X_1"},
-  "y": {f: (x, y) => y, label: "X_2"},
-  "xSquared": {f: (x, y) => x * x, label: "X_1^2"},
-  "ySquared": {f: (x, y) => y * y,  label: "X_2^2"},
-  "xTimesY": {f: (x, y) => x * y, label: "X_1X_2"},
-  "sinX": {f: (x, y) => Math.sin(x), label: "sin(X_1)"},
-  "sinY": {f: (x, y) => Math.sin(y), label: "sin(X_2)"},
+let INPUTS: { [name: string]: InputFeature } = {
+  "x": { f: (x, y) => x, label: "X_1" },
+  "y": { f: (x, y) => y, label: "X_2" },
+  "xSquared": { f: (x, y) => x * x, label: "X_1^2" },
+  "ySquared": { f: (x, y) => y * y, label: "X_2^2" },
+  "xTimesY": { f: (x, y) => x * y, label: "X_1X_2" },
+  "sinX": { f: (x, y) => Math.sin(x), label: "sin(X_1)" },
+  "sinY": { f: (x, y) => Math.sin(y), label: "sin(X_2)" },
 };
 
 let HIDABLE_CONTROLS = [
@@ -118,8 +123,226 @@ let HIDABLE_CONTROLS = [
   ["# of hidden layers", "numHiddenLayers"],
   ["Control points", "numControlPoints"],
   ["Spline degree", "degree"],
-  ["Init noise", "initNoise"], 
+  ["Init noise", "initNoise"],
+  ["Symbolic expression", "symbolicExpression"],
 ];
+
+type SymbolicSample = {
+  x: number;
+  target: number;
+  predicted: number;
+};
+
+class SymbolicPlot {
+  private container: d3.Selection<any>;
+  private svg: d3.Selection<any>;
+  private width: number;
+  private height: number;
+  private margin = { top: 12, right: 12, bottom: 36, left: 46 };
+  private xScale: d3.scale.Linear<number, number>;
+  private yScale: d3.scale.Linear<number, number>;
+  private xAxis: d3.svg.Axis;
+  private yAxis: d3.svg.Axis;
+  private targetPath: d3.Selection<any>;
+  private predictedPath: d3.Selection<any>;
+  private trainGroup: d3.Selection<any>;
+  private testGroup: d3.Selection<any>;
+
+  constructor(container: d3.Selection<any>) {
+    this.container = container;
+    let node = container.node() as HTMLElement;
+    this.width = Math.max(360, (node && node.offsetWidth) ? node.offsetWidth - this.margin.left - this.margin.right : 360);
+    this.height = 220;
+
+    this.xScale = d3.scale.linear()
+      .domain([-1, 1])
+      .range([0, this.width]);
+
+    this.yScale = d3.scale.linear()
+      .domain([-1, 1])
+      .range([this.height, 0]);
+
+    this.xAxis = d3.svg.axis()
+      .scale(this.xScale)
+      .orient("bottom");
+
+    this.yAxis = d3.svg.axis()
+      .scale(this.yScale)
+      .orient("left");
+
+    this.svg = container.append("svg")
+      .attr("width", this.width + this.margin.left + this.margin.right)
+      .attr("height", this.height + this.margin.top + this.margin.bottom)
+      .append("g")
+      .attr("transform", `translate(${this.margin.left},${this.margin.top})`);
+
+    this.svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", `translate(0,${this.height})`)
+      .call(this.xAxis);
+
+    this.svg.append("g")
+      .attr("class", "y axis")
+      .call(this.yAxis);
+
+    this.svg.append("text")
+      .attr("class", "symbolic-title")
+      .attr("x", this.width / 2)
+      .attr("y", -6)
+      .style("text-anchor", "middle")
+      .style("font-size", "13px")
+      .style("font-weight", "500")
+      .text("Symbolic regression response");
+
+    this.svg.append("text")
+      .attr("class", "symbolic-x-label")
+      .attr("x", this.width / 2)
+      .attr("y", this.height + this.margin.bottom - 8)
+      .style("text-anchor", "middle")
+      .style("font-size", "11px")
+      .text("x");
+
+    this.svg.append("text")
+      .attr("class", "symbolic-y-label")
+      .attr("transform", "rotate(-90)")
+      .attr("y", -this.margin.left + 12)
+      .attr("x", -this.height / 2)
+      .style("text-anchor", "middle")
+      .style("font-size", "11px")
+      .text("f(x)");
+
+    let legend = this.svg.append("g")
+      .attr("class", "symbolic-legend")
+      .attr("transform", `translate(${Math.max(0, this.width - 170)}, ${this.height + 6})`);
+
+    legend.append("line")
+      .attr("x1", 0)
+      .attr("x2", 18)
+      .attr("y1", 6)
+      .attr("y2", 6)
+      .style("stroke", "#0877bd")
+      .style("stroke-width", "3px");
+
+    legend.append("text")
+      .attr("x", 22)
+      .attr("y", 9)
+      .style("font-size", "10px")
+      .text("Ground truth");
+
+    legend.append("line")
+      .attr("x1", 98)
+      .attr("x2", 116)
+      .attr("y1", 6)
+      .attr("y2", 6)
+      .style("stroke", "#f59322")
+      .style("stroke-width", "3px");
+
+    legend.append("text")
+      .attr("x", 120)
+      .attr("y", 9)
+      .style("font-size", "10px")
+      .text("Prediction");
+
+    this.targetPath = this.svg.append("path")
+      .attr("class", "symbolic-target")
+      .style("fill", "none")
+      .style("stroke", "#0877bd")
+      .style("stroke-width", "2px");
+
+    this.predictedPath = this.svg.append("path")
+      .attr("class", "symbolic-prediction")
+      .style("fill", "none")
+      .style("stroke", "#f59322")
+      .style("stroke-width", "2px")
+      .style("stroke-dasharray", "6,3");
+
+    this.trainGroup = this.svg.append("g")
+      .attr("class", "symbolic-train");
+
+    this.testGroup = this.svg.append("g")
+      .attr("class", "symbolic-test");
+  }
+
+  setVisible(visible: boolean): void {
+    this.container.style("display", visible ? null : "none");
+  }
+
+  clear(): void {
+    this.targetPath.attr("d", "");
+    this.predictedPath.attr("d", "");
+    this.trainGroup.selectAll("circle").remove();
+    this.testGroup.selectAll("circle").remove();
+  }
+
+  update(samples: SymbolicSample[], train: Example2D[], test: Example2D[], scale: number): void {
+    if (!samples || samples.length === 0) {
+      this.clear();
+      return;
+    }
+
+    let yValues: number[] = [];
+    samples.forEach(sample => {
+      yValues.push(sample.target);
+      yValues.push(sample.predicted);
+    });
+    if (train) {
+      train.forEach(point => yValues.push(point.label * scale));
+    }
+    if (test) {
+      test.forEach(point => yValues.push(point.label * scale));
+    }
+
+    let yMin = d3.min(yValues);
+    let yMax = d3.max(yValues);
+    if (yMin == null || yMax == null) {
+      yMin = -1;
+      yMax = 1;
+    }
+    if (yMax === yMin) {
+      yMax += 1;
+      yMin -= 1;
+    }
+    let padding = Math.max(0.1, (yMax - yMin) * 0.1);
+    this.yScale.domain([yMin - padding, yMax + padding]);
+    this.xScale.domain([-1, 1]);
+
+    this.svg.select(".x.axis").call(this.xAxis);
+    this.svg.select(".y.axis").call(this.yAxis);
+
+    let targetLine = d3.svg.line<SymbolicSample>()
+      .x(d => this.xScale(d.x))
+      .y(d => this.yScale(d.target))
+      .interpolate("basis");
+
+    let predictedLine = d3.svg.line<SymbolicSample>()
+      .x(d => this.xScale(d.x))
+      .y(d => this.yScale(d.predicted))
+      .interpolate("basis");
+
+    this.targetPath.datum(samples).attr("d", targetLine);
+    this.predictedPath.datum(samples).attr("d", predictedLine);
+
+    let trainSelection = this.trainGroup.selectAll("circle").data(train || []);
+    trainSelection.enter().append("circle")
+      .attr("r", 2.5)
+      .style("fill", "#555")
+      .style("opacity", 0.7);
+    trainSelection
+      .attr("cx", d => this.xScale(d.x))
+      .attr("cy", d => this.yScale(d.label * scale));
+    trainSelection.exit().remove();
+
+    let testSelection = this.testGroup.selectAll("circle").data(test || []);
+    testSelection.enter().append("circle")
+      .attr("r", 2.5)
+      .style("fill", "#999")
+      .style("opacity", 0.7);
+    testSelection
+      .attr("cx", d => this.xScale(d.x))
+      .attr("cy", d => this.yScale(d.label * scale));
+    testSelection.exit().remove();
+  }
+}
 
 class Player {
   private timerIndex = 0;
@@ -188,26 +411,26 @@ state.getHiddenProps().forEach(prop => {
   }
 });
 
-let boundary: {[id: string]: number[][]} = {};
+let boundary: { [id: string]: number[][] } = {};
 let selectedNodeId: string = null;
 // Plot the heatmap.
 let xDomain: [number, number] = [-1, 1];
 let heatMap =
-    new HeatMap(300, DENSITY, xDomain, xDomain, d3.select("#heatmap"),
-        {showAxes: true});
+  new HeatMap(300, DENSITY, xDomain, xDomain, d3.select("#heatmap"),
+    { showAxes: true });
 let linkWidthScale = d3.scale.linear()
   .domain([0, 1])
   .range([0, 5]) // 0, 10
   .clamp(true);
 let colorScale = d3.scale.linear<string, number>()
-                     .domain([-1, 0, 1])
-                     .range(["#f59322", "#e8eaeb", "#0877bd"])
-                     .clamp(true);
+  .domain([-1, 0, 1])
+  .range(["#f59322", "#e8eaeb", "#0877bd"])
+  .clamp(true);
 
 let linkColorScale = d3.scale.linear<string, number>()
-                     .domain([-1, 0, 1])
-                     .range(["#ffffff", "#e8eaeb", "#6B6B6B"]) // #1B998B #7D2E68 #5A5A5A
-                     .clamp(true);
+  .domain([-1, 0, 1])
+  .range(["#ffffff", "#e8eaeb", "#6B6B6B"]) // #1B998B #7D2E68 #5A5A5A
+  .clamp(true);
 
 let iter = 0;
 let trainData: Example2D[] = [];
@@ -217,14 +440,16 @@ let lossTrain = 0;
 let lossTest = 0;
 let player = new Player();
 let lineChart = new AppendingLineChart(d3.select("#linechart"),
-    ["#777", "black"]);
+  ["#777", "black"]);
 // Add spline chart variable
 let splineChart: SplineChart = null;
-let edgeSplineCharts: {[edgeId: string]: SplineChart} = {};
+let edgeSplineCharts: { [edgeId: string]: SplineChart } = {};
 // Hover card spline chart
 let hoverCardSplineChart: SplineChart = null;
 // Current edge being displayed in hover card
 let currentHoverCardEdge: kan.KANEdge = null;
+let symbolicResult: SymbolicDatasetResult | null = null;
+let symbolicPlot: SymbolicPlot | null = null;
 
 function makeGUI() {
   d3.select("#reset-button").on("click", () => {
@@ -253,22 +478,28 @@ function makeGUI() {
   });
 
   d3.select("#data-regen-button").on("click", () => {
-    generateData();
-    parametersChanged = true;
+    if (generateData()) {
+      parametersChanged = true;
+    }
   });
 
   let dataThumbnails = d3.selectAll("canvas[data-dataset]");
-  dataThumbnails.on("click", function() {
-    let newDataset = datasets[this.dataset.dataset];
+  dataThumbnails.on("click", function (this: HTMLCanvasElement) {
+    const key = this.dataset["dataset"];
+    if (!key) {
+      return;
+    }
+    let newDataset = datasets[key];
     if (newDataset === state.dataset) {
       return; // No-op.
     }
-    state.dataset =  newDataset;
+    state.dataset = newDataset;
     dataThumbnails.classed("selected", false);
     d3.select(this).classed("selected", true);
-    generateData();
-    parametersChanged = true;
-    reset();
+    if (generateData()) {
+      parametersChanged = true;
+      reset();
+    }
   });
 
   let datasetKey = getKeyFromValue(datasets, state.dataset);
@@ -277,17 +508,22 @@ function makeGUI() {
     .classed("selected", true);
 
   let regDataThumbnails = d3.selectAll("canvas[data-regDataset]");
-  regDataThumbnails.on("click", function() {
-    let newDataset = regDatasets[this.dataset.regdataset];
+  regDataThumbnails.on("click", function (this: HTMLCanvasElement) {
+    const key = this.dataset["regdataset"];
+    if (!key) {
+      return;
+    }
+    let newDataset = regDatasets[key];
     if (newDataset === state.regDataset) {
       return; // No-op.
     }
-    state.regDataset =  newDataset;
+    state.regDataset = newDataset;
     regDataThumbnails.classed("selected", false);
     d3.select(this).classed("selected", true);
-    generateData();
-    parametersChanged = true;
-    reset();
+    if (generateData()) {
+      parametersChanged = true;
+      reset();
+    }
   });
 
   let regDatasetKey = getKeyFromValue(regDatasets, state.regDataset);
@@ -315,7 +551,7 @@ function makeGUI() {
     reset();
   });
 
-  let showTestData = d3.select("#show-test-data").on("change", function() {
+  let showTestData = d3.select("#show-test-data").on("change", function (this: HTMLInputElement) {
     state.showTestData = this.checked;
     state.serialize();
     userHasInteracted();
@@ -324,7 +560,7 @@ function makeGUI() {
   // Check/uncheck the checkbox according to the current state.
   showTestData.property("checked", state.showTestData);
 
-  let discretize = d3.select("#discretize").on("change", function() {
+  let discretize = d3.select("#discretize").on("change", function (this: HTMLInputElement) {
     state.discretize = this.checked;
     state.serialize();
     userHasInteracted();
@@ -333,22 +569,24 @@ function makeGUI() {
   // Check/uncheck the checbox according to the current state.
   discretize.property("checked", state.discretize);
 
-  let percTrain = d3.select("#percTrainData").on("input", function() {
-    state.percTrainData = this.value;
+  let percTrain = d3.select("#percTrainData").on("input", function (this: HTMLInputElement) {
+    state.percTrainData = +this.value;
     d3.select("label[for='percTrainData'] .value").text(this.value);
-    generateData();
-    parametersChanged = true;
-    reset();
+    if (generateData()) {
+      parametersChanged = true;
+      reset();
+    }
   });
   percTrain.property("value", state.percTrainData);
   d3.select("label[for='percTrainData'] .value").text(state.percTrainData);
 
-  let noise = d3.select("#noise").on("input", function() {
-    state.noise = this.value;
+  let noise = d3.select("#noise").on("input", function (this: HTMLInputElement) {
+    state.noise = +this.value;
     d3.select("label[for='noise'] .value").text(this.value);
-    generateData();
-    parametersChanged = true;
-    reset();
+    if (generateData()) {
+      parametersChanged = true;
+      reset();
+    }
   });
   let currentMax = parseInt(noise.property("max"));
   if (state.noise > currentMax) {
@@ -363,8 +601,8 @@ function makeGUI() {
   noise.property("value", state.noise);
   d3.select("label[for='noise'] .value").text(state.noise);
 
-  let batchSize = d3.select("#batchSize").on("input", function() {
-    state.batchSize = this.value;
+  let batchSize = d3.select("#batchSize").on("input", function (this: HTMLInputElement) {
+    state.batchSize = +this.value;
     d3.select("label[for='batchSize'] .value").text(this.value);
     parametersChanged = true;
     reset();
@@ -372,19 +610,22 @@ function makeGUI() {
   batchSize.property("value", state.batchSize);
   d3.select("label[for='batchSize'] .value").text(state.batchSize);
 
-  let problemDropdown = d3.select("#problem").on("change", function() {
+  let problemDropdown = d3.select("#problem").on("change", function (this: HTMLSelectElement) {
     state.problem = problems[this.value];
     state.serialize();
     userHasInteracted();
     parametersChanged = true;
-    generateData();
+    updateProblemSpecificUI();
+    const ok = generateData(false, { allowSymbolicFallback: true });
     drawDatasetThumbnails();
-    reset();
+    if (ok) {
+      reset();
+    }
   });
   problemDropdown.property("value",
-      getKeyFromValue(problems, state.problem));
+    getKeyFromValue(problems, state.problem));
 
-  let learningRate = d3.select("#learningRate").on("change", function() {
+  let learningRate = d3.select("#learningRate").on("change", function (this: HTMLSelectElement) {
     state.learningRate = +this.value;
     state.serialize();
     userHasInteracted();
@@ -393,8 +634,24 @@ function makeGUI() {
   });
   learningRate.property("value", state.learningRate);
 
+  let symbolicExpressionInput = d3.select("#symbolicExpression");
+  if (!symbolicExpressionInput.empty()) {
+    symbolicExpressionInput.on("input", function (this: HTMLInputElement) {
+      state.symbolicExpression = this.value;
+      const ok = generateData(false, { allowSymbolicFallback: false });
+      state.serialize();
+      drawDatasetThumbnails();
+      if (ok) {
+        userHasInteracted();
+        parametersChanged = true;
+        reset();
+      }
+    });
+    symbolicExpressionInput.property("value", state.symbolicExpression || "");
+  }
+
   // numControlPoints UI
-  let numControlPointsSel = d3.select("#numControlPoints").on("change", function() {
+  let numControlPointsSel = d3.select("#numControlPoints").on("change", function (this: HTMLSelectElement) {
     state.numControlPoints = +this.value;
     state.serialize();
     userHasInteracted();
@@ -403,7 +660,7 @@ function makeGUI() {
   });
   numControlPointsSel.property("value", state.numControlPoints);
 
-  let degree = d3.select("#degree").on("change", function() {
+  let degree = d3.select("#degree").on("change", function (this: HTMLSelectElement) {
     state.degree = +this.value;
     state.serialize();
     userHasInteracted();
@@ -416,7 +673,7 @@ function makeGUI() {
   updateNumControlPointsOptionsForDegree(+degree.property("value"), state.numControlPoints);
 
   // Keep options in sync when degree changes
-  d3.select("#degree").on("change.gridOptions", function() {
+  d3.select("#degree").on("change.gridOptions", function () {
     const degVal = +(this as HTMLSelectElement).value;
     const currentCP = +d3.select("#numControlPoints").property("value") || state.numControlPoints;
     updateNumControlPointsOptionsForDegree(degVal, currentCP);
@@ -425,7 +682,7 @@ function makeGUI() {
   // Add initNoise control
   const initNoiseSel = d3.select("#initNoise");
 
-  let initNoise = initNoiseSel.on("change", function() {
+  let initNoise = initNoiseSel.on("change", function () {
     const raw = (this as HTMLSelectElement).value;
     const parsed = parseFloat(raw);
     (state as any).initNoise = isNaN(parsed) ? (raw as any) : parsed;
@@ -452,7 +709,7 @@ function makeGUI() {
   // Listen for css-responsive changes and redraw the svg network.
   window.addEventListener("resize", () => {
     let newWidth = document.querySelector("#main-part")
-        .getBoundingClientRect().width;
+      .getBoundingClientRect().width;
     if (newWidth !== mainWidth) {
       mainWidth = newWidth;
       drawNetwork(network);
@@ -466,16 +723,18 @@ function makeGUI() {
     d3.select("div.more").style("display", "none");
     d3.select("header").style("display", "none");
   }
+
+  updateProblemSpecificUI();
 }
 
 function updateWeightsUI(network: kan.KANNode[][], container) {
   for (let layerIdx = 1; layerIdx < network.length; layerIdx++) {
     let currentLayer = network[layerIdx];
-    
+
     // First pass: calculate all norms for this layer and find the maximum
-    let layerNorms: {[edgeId: string]: number} = {};
+    let layerNorms: { [edgeId: string]: number } = {};
     let maxNorm = 0;
-    
+
     for (let i = 0; i < currentLayer.length; i++) {
       let node = currentLayer[i];
       for (let j = 0; j < node.inputEdges.length; j++) {
@@ -486,12 +745,12 @@ function updateWeightsUI(network: kan.KANNode[][], container) {
         maxNorm = Math.max(maxNorm, normWeight);
       }
     }
-    
+
     // Avoid division by zero
     if (maxNorm === 0) {
       maxNorm = 1;
     }
-    
+
     // Second pass: update all the visual elements with normalized weights
     for (let i = 0; i < currentLayer.length; i++) {
       let node = currentLayer[i];
@@ -499,31 +758,31 @@ function updateWeightsUI(network: kan.KANNode[][], container) {
         let edge = node.inputEdges[j];
         let edgeId = `${edge.sourceNode.id}-${edge.destNode.id}`;
         let normalizedWeight = layerNorms[edgeId] / maxNorm;
-        
+
         // Update the first link (source to spline chart)
         container.select(`#link${edgeId}-part1`)
-            .style({
-              "stroke-dashoffset": -iter / 3,
-              "stroke-width": linkWidthScale(normalizedWeight),
-              "stroke": linkColorScale(normalizedWeight)
-            });
-            
+          .style({
+            "stroke-dashoffset": -iter / 3,
+            "stroke-width": linkWidthScale(normalizedWeight),
+            "stroke": linkColorScale(normalizedWeight)
+          });
+
         // Update the second link (spline chart to destination)
         container.select(`#link${edgeId}-part2`)
-            .style({
-              "stroke-dashoffset": -iter / 3,
-              "stroke-width": linkWidthScale(normalizedWeight),
-              "stroke": linkColorScale(normalizedWeight)
-            });
-            
+          .style({
+            "stroke-dashoffset": -iter / 3,
+            "stroke-width": linkWidthScale(normalizedWeight),
+            "stroke": linkColorScale(normalizedWeight)
+          });
+
         // Update the spline chart
         if (edgeSplineCharts[edgeId]) {
           edgeSplineCharts[edgeId].updateFunction(edge.learnableFunction);
         }
-        
+
         // Update hover card spline chart if it's showing this edge
-        if (currentHoverCardEdge && hoverCardSplineChart && 
-            currentHoverCardEdge === edge) {
+        if (currentHoverCardEdge && hoverCardSplineChart &&
+          currentHoverCardEdge === edge) {
           hoverCardSplineChart.updateFunction(edge.learnableFunction);
         }
       }
@@ -532,7 +791,7 @@ function updateWeightsUI(network: kan.KANNode[][], container) {
 }
 
 function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
-    container, node?: kan.KANNode) {
+  container, node?: kan.KANNode) {
   let x = cx - RECT_SIZE / 2;
   let y = cy - RECT_SIZE / 2;
 
@@ -551,10 +810,10 @@ function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
       width: RECT_SIZE,
       height: RECT_SIZE,
     });
-  let activeOrNotClass = state[nodeId] ? "active" : "inactive";
+  let activeOrNotClass = isInputFeatureActive(nodeId) ? "active" : "inactive";
   if (isInput) {
     let label = INPUTS[nodeId].label != null ?
-        INPUTS[nodeId].label : nodeId;
+      INPUTS[nodeId].label : nodeId;
     // Draw the input label.
     let text = nodeGroup.append("text").attr({
       class: "main-label",
@@ -574,9 +833,9 @@ function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
           text.append("tspan").text(prefix);
         }
         text.append("tspan")
-        .attr("baseline-shift", sep === "_" ? "sub" : "super")
-        .style("font-size", "9px")
-        .text(suffix);
+          .attr("baseline-shift", sep === "_" ? "sub" : "super")
+          .style("font-size", "9px")
+          .text(suffix);
       }
       if (label.substring(lastIndex)) {
         text.append("tspan").text(label.substring(lastIndex));
@@ -598,35 +857,44 @@ function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
       left: `${x + 3}px`,
       top: `${y + 3}px`
     })
-    .on("mouseenter", function() {
+    .on("mouseenter", function () {
       selectedNodeId = nodeId;
       div.classed("hovered", true);
       nodeGroup.classed("hovered", true);
       updateDecisionBoundary(network, false);
       heatMap.updateBackground(boundary[nodeId], state.discretize);
     })
-    .on("mouseleave", function() {
+    .on("mouseleave", function () {
       selectedNodeId = null;
       div.classed("hovered", false);
       nodeGroup.classed("hovered", false);
       updateDecisionBoundary(network, false);
       heatMap.updateBackground(boundary[kan.getKANOutputNode(network).id],
-          state.discretize);
+        state.discretize);
     });
   if (isInput) {
-    div.on("click", function() {
-      state[nodeId] = !state[nodeId];
-      parametersChanged = true;
-      reset();
-    });
-    div.style("cursor", "pointer");
+    let selectable = state.problem !== Problem.SYMBOLIC || !!SYMBOLIC_ALLOWED_INPUTS[nodeId];
+    if (selectable) {
+      div.on("click", function () {
+        state[nodeId] = !state[nodeId];
+        parametersChanged = true;
+        reset();
+      });
+      div.style("cursor", "pointer");
+    } else {
+      state[nodeId] = !!SYMBOLIC_ALLOWED_INPUTS[nodeId];
+      div.on("click", null);
+      div.classed("disabled", true);
+      div.style("cursor", "not-allowed");
+    }
   }
   if (isInput) {
-    div.classed(activeOrNotClass, true);
+    div.classed("active", isInputFeatureActive(nodeId));
+    div.classed("inactive", !isInputFeatureActive(nodeId));
   }
   let nodeHeatMap = new HeatMap(RECT_SIZE, DENSITY / 10, xDomain,
-      xDomain, div, {noSvg: true});
-  div.datum({heatmap: nodeHeatMap, id: nodeId});
+    xDomain, div, { noSvg: true });
+  div.datum({ heatmap: nodeHeatMap, id: nodeId });
 
 }
 
@@ -663,7 +931,7 @@ function drawNetwork(network: kan.KANNode[][]): void {
   svg.attr("width", width);
 
   // Map of all node coordinates.
-  let node2coord: {[id: string]: {cx: number, cy: number}} = {};
+  let node2coord: { [id: string]: { cx: number, cy: number } } = {};
   let container = svg.append("g")
     .classed("core", true)
     .attr("transform", `translate(${padding},${padding})`);
@@ -671,11 +939,11 @@ function drawNetwork(network: kan.KANNode[][]): void {
   let numLayers = network.length;
   let featureWidth = 118;
   let layerScale = d3.scale.ordinal<number, number>()
-      .domain(d3.range(1, numLayers - 1))
-      .rangePoints([featureWidth, width - RECT_SIZE], 0.7);
+    .domain(d3.range(1, numLayers - 1))
+    .rangePoints([featureWidth, width - RECT_SIZE], 0.7);
   let splineIndexScale = (nodeIndex: number) => nodeIndex * (RECT_SIZE + 10);
   let nodeIndexScale = (nodeIndex: number) => nodeIndex * (RECT_SIZE + 25);
-  
+
   // Calculate maxY before drawing anything
   let nodeIds = Object.keys(INPUTS);
   let maxLearnableFunctions = getMaxLearnableFunctions(network);
@@ -686,7 +954,7 @@ function drawNetwork(network: kan.KANNode[][]): void {
     let numNodes = network[layerIdx].length;
     maxY = Math.max(maxY, nodeIndexScale(numNodes));
   }
-  
+
   maxY = Math.max(maxY, 400);
   // Set SVG height early based on calculated maxY
   svg.attr("height", maxY);
@@ -701,7 +969,7 @@ function drawNetwork(network: kan.KANNode[][]): void {
 
   nodeIds.forEach((nodeId, i) => {
     let cy = nodeIndexScale(i) + RECT_SIZE / 2;
-    node2coord[nodeId] = {cx, cy};
+    node2coord[nodeId] = { cx, cy };
     drawNode(cx, cy, nodeId, true, container);
   });
 
@@ -713,15 +981,15 @@ function drawNetwork(network: kan.KANNode[][]): void {
     for (let i = 0; i < numNodes; i++) {
       let node = network[layerIdx][i];
       let cy = nodeIndexScale(i) + RECT_SIZE / 2;
-      node2coord[node.id] = {cx, cy};
+      node2coord[node.id] = { cx, cy };
       drawNode(cx, cy, node.id, false, container, node);
 
       // Show callout to thumbnails.
       let numNodes = network[layerIdx].length;
       let nextNumNodes = network[layerIdx + 1].length;
       if (idWithCallout == null &&
-          i === numNodes - 1 &&
-          nextNumNodes <= numNodes) {
+        i === numNodes - 1 &&
+        nextNumNodes <= numNodes) {
         calloutThumb.style({
           display: null,
           top: `${20 + 3 + cy}px`,
@@ -736,40 +1004,40 @@ function drawNetwork(network: kan.KANNode[][]): void {
   cx = width + RECT_SIZE / 2;
   let node = network[numLayers - 1][0];
   let cy = nodeIndexScale(0) + RECT_SIZE / 2;
-  node2coord[node.id] = {cx, cy};
+  node2coord[node.id] = { cx, cy };
 
   // Calculate global spline chart positions for each layer
   for (let layerIdx = 1; layerIdx < numLayers; layerIdx++) {
     let splinePositions = calculateGlobalSplinePositions(network, layerIdx, node2coord);
-    
+
     // Draw all edges with spline charts for this layer
     let currentLayer = network[layerIdx];
     for (let nodeIdx = 0; nodeIdx < currentLayer.length; nodeIdx++) {
       let node = currentLayer[nodeIdx];
-      
+
       for (let edgeIdx = 0; edgeIdx < node.inputEdges.length; edgeIdx++) {
         let edge = node.inputEdges[edgeIdx];
         let edgeKey = `${edge.sourceNode.id}-${edge.destNode.id}`;
         let splinePosition = splinePositions[edgeKey];
-        
-        drawLinkWithSplineChart(edge, node2coord, network, container, 
-                              edgeIdx === 0, edgeIdx, node.inputEdges.length, 
-                              splinePosition);
-        
+
+        drawLinkWithSplineChart(edge, node2coord, network, container,
+          edgeIdx === 0, edgeIdx, node.inputEdges.length,
+          splinePosition);
+
         // Show callout to weights for the last edge of the last node in certain conditions
         if (targetIdWithCallout == null &&
-            nodeIdx === currentLayer.length - 1 &&
-            edgeIdx === node.inputEdges.length - 1) {
+          nodeIdx === currentLayer.length - 1 &&
+          edgeIdx === node.inputEdges.length - 1) {
           let prevLayer = network[layerIdx - 1];
           let lastNodePrevLayer = prevLayer[prevLayer.length - 1];
           if (edge.sourceNode.id === lastNodePrevLayer.id &&
-              (edge.sourceNode.id !== idWithCallout || numLayers <= 5) &&
-              edge.destNode.id !== idWithCallout &&
-              prevLayer.length >= currentLayer.length) {
+            (edge.sourceNode.id !== idWithCallout || numLayers <= 5) &&
+            edge.destNode.id !== idWithCallout &&
+            prevLayer.length >= currentLayer.length) {
             // Position callout at the spline chart location
             calloutWeights.style({
               display: null,
-              top: `${splinePosition.y + SPLINE_CHART_SIZE/2 + 5}px`,
+              top: `${splinePosition.y + SPLINE_CHART_SIZE / 2 + 5}px`,
               left: `${splinePosition.x + 3}px`
             });
             targetIdWithCallout = edge.destNode.id;
@@ -790,14 +1058,14 @@ function drawNetwork(network: kan.KANNode[][]): void {
 }
 
 function calculateGlobalSplinePositions(
-  network: kan.KANNode[][], 
-  layerIdx: number, 
-  node2coord: {[id: string]: {cx: number, cy: number}}
-): {[edgeKey: string]: {x: number, y: number}} {
-  
+  network: kan.KANNode[][],
+  layerIdx: number,
+  node2coord: { [id: string]: { cx: number, cy: number } }
+): { [edgeKey: string]: { x: number, y: number } } {
+
   const VERTICAL_BUFFER = 5;
   const CHART_WITH_BUFFER = SPLINE_CHART_SIZE + (2 * VERTICAL_BUFFER);
-  
+
   // Get SVG dimensions
   let svg = d3.select("#svg");
   let svgHeight = parseInt(svg.attr("height")) || 600; // fallback height
@@ -806,8 +1074,8 @@ function calculateGlobalSplinePositions(
   let maxY = svgHeight - padding - SPLINE_CHART_SIZE / 2 - VERTICAL_BUFFER;
 
   // Collect all edges for this layer and sort them by source node position, then destination node position
-  let allEdges: {edge: kan.KANEdge, sourceY: number, destY: number, edgeKey: string}[] = [];
-  
+  let allEdges: { edge: kan.KANEdge, sourceY: number, destY: number, edgeKey: string }[] = [];
+
   let currentLayer = network[layerIdx];
   for (let nodeIdx = 0; nodeIdx < currentLayer.length; nodeIdx++) {
     let node = currentLayer[nodeIdx];
@@ -816,7 +1084,7 @@ function calculateGlobalSplinePositions(
       let edgeKey = `${edge.sourceNode.id}-${edge.destNode.id}`;
       let sourceCoord = node2coord[edge.sourceNode.id];
       let destCoord = node2coord[edge.destNode.id];
-      
+
       allEdges.push({
         edge: edge,
         sourceY: sourceCoord.cy,
@@ -825,7 +1093,7 @@ function calculateGlobalSplinePositions(
       });
     }
   }
-  
+
   // Sort edges by destination node Y position first, then by source node Y position
   // This groups edges going to the same destination node together
   allEdges.sort((a, b) => {
@@ -834,72 +1102,72 @@ function calculateGlobalSplinePositions(
     }
     return a.sourceY - b.sourceY;
   });
-  
+
   // Calculate spacing (compress if necessary)
   let availableHeight = maxY - minY;
   let spacing = CHART_WITH_BUFFER;
-  
+
   if (allEdges.length > 1) {
     let totalHeight = (allEdges.length - 1) * CHART_WITH_BUFFER;
     if (totalHeight > availableHeight) {
       spacing = Math.max(SPLINE_CHART_SIZE + 2, availableHeight / (allEdges.length - 1));
     }
   }
-  
+
   // Start from the top (minY) instead of centering
   let startY = minY;
-  
+
   // Assign positions to each edge
-  let positions: {[edgeKey: string]: {x: number, y: number}} = {};
-  
+  let positions: { [edgeKey: string]: { x: number, y: number } } = {};
+
   allEdges.forEach((edgeInfo, index) => {
     let sourceCoord = node2coord[edgeInfo.edge.sourceNode.id];
     let destCoord = node2coord[edgeInfo.edge.destNode.id];
-    
+
     let splineX = (sourceCoord.cx + destCoord.cx) / 2;
     let splineY = startY + index * spacing;
-    
+
     // Ensure the spline chart stays within bounds
     splineY = Math.max(minY, Math.min(maxY, splineY));
-    
+
     positions[edgeInfo.edgeKey] = {
       x: splineX,
       y: splineY
     };
   });
-  
+
   return positions;
 }
 
 function drawLinkWithSplineChart(
-    edge: kan.KANEdge, node2coord: {[id: string]: {cx: number, cy: number}},
-    network: kan.KANNode[][], container,
-    isFirst: boolean, index: number, length: number, 
-    splinePosition: {x: number, y: number}) {
-  
+  edge: kan.KANEdge, node2coord: { [id: string]: { cx: number, cy: number } },
+  network: kan.KANNode[][], container,
+  isFirst: boolean, index: number, length: number,
+  splinePosition: { x: number, y: number }) {
+
   let source = node2coord[edge.sourceNode.id];
   let dest = node2coord[edge.destNode.id];
   let edgeId = `${edge.sourceNode.id}-${edge.destNode.id}`;
-  
+
   // Get SVG dimensions and padding
   let svg = d3.select("#svg");
   let svgWidth = parseInt(svg.attr("width"));
   let svgHeight = parseInt(svg.attr("height"));
   let padding = 3;
-  
+
   // Use the globally calculated spline position
   let splineX = splinePosition.x;
   let splineY = splinePosition.y;
-  
+
   // Constrain spline chart position to stay within SVG bounds
   let minX = padding + SPLINE_CHART_SIZE / 2;
   let maxX = svgWidth - padding - SPLINE_CHART_SIZE / 2;
   let minY = padding + SPLINE_CHART_SIZE / 2;
   let maxY = svgHeight - padding - SPLINE_CHART_SIZE / 2;
-  
+
   splineX = Math.max(minX, Math.min(maxX, splineX));
   splineY = Math.max(minY, Math.min(maxY, splineY));
-  
+
   // Create spline chart div
   let splineDiv = d3.select("#network").append("div")
     .attr("class", "spline-chart")
@@ -932,14 +1200,14 @@ function drawLinkWithSplineChart(
 
   // Store the spline chart for updates
   edgeSplineCharts[edgeId] = splineChart;
-  
+
   // Update spline chart with the learnable function
   splineChart.updateFunction(edge.learnableFunction);
 
   // Add hover functionality to spline chart div
-  splineDiv.on("mouseenter", function() {
+  splineDiv.on("mouseenter", function () {
     updateHoverCard(HoverType.WEIGHT, edge, [splineX, splineY]);
-  }).on("mouseleave", function() {
+  }).on("mouseleave", function () {
     updateHoverCard(null);
   });
 
@@ -1061,15 +1329,15 @@ function updateUI(firstStep = false) {
   // Get the decision boundary of the network.
   updateDecisionBoundary(network, firstStep);
   let selectedId = selectedNodeId != null ?
-      selectedNodeId : kan.getKANOutputNode(network).id;
+    selectedNodeId : kan.getKANOutputNode(network).id;
   heatMap.updateBackground(boundary[selectedId], state.discretize);
 
   // Update all decision boundaries.
   d3.select("#network").selectAll("div.canvas")
-      .each(function(data: {heatmap: HeatMap, id: string}) {
-    data.heatmap.updateBackground(reduceMatrix(boundary[data.id], 10),
+    .each(function (data: { heatmap: HeatMap, id: string }) {
+      data.heatmap.updateBackground(reduceMatrix(boundary[data.id], 10),
         state.discretize);
-  });
+    });
 
   function zeroPad(n: number): string {
     let pad = "000000";
@@ -1089,12 +1357,23 @@ function updateUI(firstStep = false) {
   d3.select("#loss-test").text(humanReadable(lossTest));
   d3.select("#iter-number").text(addCommas(zeroPad(iter)));
   lineChart.addDataPoint([lossTrain, lossTest]);
+  updateSymbolicPlot();
+}
+
+function isInputFeatureActive(inputName: string): boolean {
+  if (!state[inputName]) {
+    return false;
+  }
+  if (state.problem === Problem.SYMBOLIC) {
+    return !!SYMBOLIC_ALLOWED_INPUTS[inputName];
+  }
+  return true;
 }
 
 function constructInputIds(): string[] {
   let result: string[] = [];
   for (let inputName in INPUTS) {
-    if (state[inputName]) {
+    if (isInputFeatureActive(inputName)) {
       result.push(inputName);
     }
   }
@@ -1104,7 +1383,7 @@ function constructInputIds(): string[] {
 function constructInput(x: number, y: number): number[] {
   let input: number[] = [];
   for (let inputName in INPUTS) {
-    if (state[inputName]) {
+    if (isInputFeatureActive(inputName)) {
       input.push(INPUTS[inputName].f(x, y));
     }
   }
@@ -1144,7 +1423,7 @@ export function getOutputWeights(network: kan.KANNode[][]): number[] {
   return weights;
 }
 
-function reset(onStartup=false) {
+function reset(onStartup = false) {
   lineChart.reset();
   state.serialize();
   if (!onStartup) {
@@ -1158,7 +1437,7 @@ function reset(onStartup=false) {
 
   // Make a KAN network.
   iter = 0;
-  let numInputs = constructInput(0 , 0).length;
+  let numInputs = constructInput(0, 0).length;
   let shape = [numInputs].concat(state.networkShape).concat([1]);
 
   // Derive gridSize from numControlPoints
@@ -1192,7 +1471,7 @@ function initTutorial() {
         "margin-top": "20px",
         "margin-bottom": "20px",
       })
-      .text(title.text());
+        .text(title.text());
       document.title = title.text();
     }
   });
@@ -1206,7 +1485,7 @@ function drawDatasetThumbnails() {
     canvas.setAttribute("height", h);
     let context = canvas.getContext("2d");
     let data = dataGenerator(200, 0);
-    data.forEach(function(d) {
+    data.forEach(function (d) {
       context.fillStyle = colorScale(d.label);
       context.fillRect(w * (d.x + 1) / 2, h * (d.y + 1) / 2, 4, 4);
     });
@@ -1214,10 +1493,17 @@ function drawDatasetThumbnails() {
   }
   d3.selectAll(".dataset").style("display", "none");
 
+  if (state.problem === Problem.SYMBOLIC) {
+    renderSymbolicThumbnail();
+    return;
+  }
+
+  renderSymbolicThumbnail(null);
+
   if (state.problem === Problem.CLASSIFICATION) {
     for (let dataset in datasets) {
       let canvas: any =
-          document.querySelector(`canvas[data-dataset=${dataset}]`);
+        document.querySelector(`canvas[data-dataset=${dataset}]`);
       let dataGenerator = datasets[dataset];
       renderThumbnail(canvas, dataGenerator);
     }
@@ -1225,7 +1511,7 @@ function drawDatasetThumbnails() {
   if (state.problem === Problem.REGRESSION) {
     for (let regDataset in regDatasets) {
       let canvas: any =
-          document.querySelector(`canvas[data-regDataset=${regDataset}]`);
+        document.querySelector(`canvas[data-regDataset=${regDataset}]`);
       let dataGenerator = regDatasets[regDataset];
       renderThumbnail(canvas, dataGenerator);
     }
@@ -1257,7 +1543,7 @@ function hideControls() {
     if (hiddenProps.indexOf(id) === -1) {
       input.attr("checked", "true");
     }
-    input.on("change", function() {
+    input.on("change", function () {
       state.setHideProperty(id, !this.checked);
       state.serialize();
       userHasInteracted();
@@ -1272,19 +1558,44 @@ function hideControls() {
     .attr("href", window.location.href);
 }
 
-function generateData(firstTime = false) {
+function generateData(firstTime = false, options: { allowSymbolicFallback?: boolean } = {}): boolean {
+  let newSeed = state.seed;
   if (!firstTime) {
-    // Change the seed.
-    state.seed = Math.random().toFixed(5);
-    state.serialize();
-    userHasInteracted();
+    newSeed = Math.random().toFixed(5);
   }
-  Math.seedrandom(state.seed);
-  let numSamples = (state.problem === Problem.REGRESSION) ?
+  Math.seedrandom(newSeed);
+
+  let numSamples: number;
+  let data: Example2D[] = [];
+
+  if (state.problem === Problem.SYMBOLIC) {
+    numSamples = NUM_SAMPLES_SYMBOLIC;
+    const allowFallback = options.allowSymbolicFallback != null ?
+      options.allowSymbolicFallback : firstTime;
+    symbolicResult = generateSymbolicDataset(
+      numSamples,
+      state.noise / 100,
+      state.symbolicExpression,
+      allowFallback);
+    updateSymbolicExpressionFeedback();
+    if (!symbolicResult || !symbolicResult.isValid) {
+      return false;
+    }
+    data = symbolicResult.data;
+  } else {
+    symbolicResult = null;
+    numSamples = (state.problem === Problem.REGRESSION) ?
       NUM_SAMPLES_REGRESS : NUM_SAMPLES_CLASSIFY;
-  let generator = state.problem === Problem.CLASSIFICATION ?
+    let generator = state.problem === Problem.CLASSIFICATION ?
       state.dataset : state.regDataset;
-  let data = generator(numSamples, state.noise / 100);
+    data = generator(numSamples, state.noise / 100);
+    clearSymbolicFeedback();
+  }
+
+  if (!data || data.length === 0) {
+    return false;
+  }
+
   // Shuffle the data in-place.
   shuffle(data);
   // Split into train and test data.
@@ -1293,6 +1604,199 @@ function generateData(firstTime = false) {
   testData = data.slice(splitIndex);
   heatMap.updatePoints(trainData);
   heatMap.updateTestPoints(state.showTestData ? testData : []);
+
+  if (!firstTime) {
+    state.seed = newSeed;
+    state.serialize();
+    userHasInteracted();
+  }
+
+  return true;
+}
+
+function renderSymbolicThumbnail(result: SymbolicDatasetResult | null = symbolicResult): void {
+  let canvas = document.getElementById("symbolic-thumbnail") as HTMLCanvasElement;
+  if (!canvas) {
+    return;
+  }
+  const width = canvas.width = 200;
+  const height = canvas.height = 100;
+  let ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return;
+  }
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = "#fafafa";
+  ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = "#d0d0d0";
+  ctx.beginPath();
+  ctx.moveTo(0, height / 2);
+  ctx.lineTo(width, height / 2);
+  ctx.stroke();
+
+  if (!result || !result.isValid) {
+    return;
+  }
+
+  const samples: number[] = [];
+  let maxAbs = 0;
+  for (let i = 0; i < SYMBOLIC_PREVIEW_SAMPLES; i++) {
+    const x = -1 + (2 * i) / Math.max(1, SYMBOLIC_PREVIEW_SAMPLES - 1);
+    let value = 0;
+    try {
+      value = result.evaluator(x);
+      if (!isFinite(value) || isNaN(value)) {
+        value = 0;
+      }
+    } catch (e) {
+      value = 0;
+    }
+    maxAbs = Math.max(maxAbs, Math.abs(value));
+    samples.push(value);
+  }
+  if (!isFinite(maxAbs) || maxAbs < 1e-6) {
+    maxAbs = 1;
+  }
+
+  ctx.strokeStyle = "#0877bd";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  samples.forEach((val, idx) => {
+    const xPos = (idx / Math.max(1, SYMBOLIC_PREVIEW_SAMPLES - 1)) * width;
+    const yPos = height / 2 - (val / maxAbs) * (height * 0.4);
+    if (idx === 0) {
+      ctx.moveTo(xPos, yPos);
+    } else {
+      ctx.lineTo(xPos, yPos);
+    }
+  });
+  ctx.stroke();
+}
+
+function updateSymbolicErrorMessage(result: SymbolicDatasetResult | null = symbolicResult): void {
+  let container = document.getElementById("symbolic-error");
+  if (!container) {
+    return;
+  }
+  if (!result) {
+    container.textContent = "";
+    (container as HTMLElement).style.display = "none";
+    return;
+  }
+  let messages: string[] = [];
+  if (result.compileError) {
+    messages.push(result.compileError);
+  }
+  if (result.usedFallback) {
+    messages.push("Using fallback sin(pi*x) function.");
+  }
+  if (messages.length === 0) {
+    container.textContent = "";
+    (container as HTMLElement).style.display = "none";
+    return;
+  }
+  container.textContent = messages.join(" ");
+  (container as HTMLElement).style.display = "block";
+}
+
+function updateSymbolicSanitizedExpression(result: SymbolicDatasetResult | null = symbolicResult): void {
+  let wrapper = document.getElementById("symbolic-expression-display");
+  let codeEl = document.getElementById("symbolic-sanitized-expression");
+  if (!wrapper || !codeEl) {
+    return;
+  }
+  if (!result || !result.sanitizedExpression || !result.isValid) {
+    wrapper.style.display = "none";
+    codeEl.textContent = "";
+    return;
+  }
+  wrapper.style.display = "block";
+  codeEl.textContent = result.sanitizedExpression;
+}
+
+function updateSymbolicExpressionFeedback(): void {
+  renderSymbolicThumbnail();
+  updateSymbolicErrorMessage();
+  updateSymbolicSanitizedExpression();
+}
+
+function clearSymbolicFeedback(): void {
+  renderSymbolicThumbnail(null);
+  updateSymbolicErrorMessage(null);
+  updateSymbolicSanitizedExpression(null);
+}
+
+function ensureSymbolicPlot(): SymbolicPlot | null {
+  if (!symbolicPlot) {
+    const container = d3.select("#symbolic-plot");
+    if (container.empty()) {
+      return null;
+    }
+    symbolicPlot = new SymbolicPlot(container);
+  }
+  return symbolicPlot;
+}
+
+function updateSymbolicPlot(): void {
+  if (state.problem !== Problem.SYMBOLIC) {
+    if (symbolicPlot) {
+      symbolicPlot.clear();
+      symbolicPlot.setVisible(false);
+    }
+    return;
+  }
+  let plot = ensureSymbolicPlot();
+  if (!plot) {
+    return;
+  }
+  plot.setVisible(true);
+  if (!symbolicResult || !symbolicResult.isValid) {
+    plot.clear();
+    return;
+  }
+  let scale = symbolicResult.normalizationScale || 1;
+  let samples: SymbolicSample[] = [];
+  for (let i = 0; i < SYMBOLIC_PREVIEW_SAMPLES; i++) {
+    const x = -1 + (2 * i) / Math.max(1, SYMBOLIC_PREVIEW_SAMPLES - 1);
+    let target = 0;
+    try {
+      target = symbolicResult.evaluator(x);
+      if (!isFinite(target) || isNaN(target)) {
+        target = 0;
+      }
+    } catch (e) {
+      target = 0;
+    }
+    const input = constructInput(x, 0);
+    const predictedNormalized = kan.kanForwardProp(network, input);
+    const predicted = predictedNormalized * scale;
+    samples.push({ x, target, predicted });
+  }
+  plot.update(samples, trainData, testData, scale);
+}
+
+function updateProblemSpecificUI(): void {
+  let isSymbolic = state.problem === Problem.SYMBOLIC;
+  d3.selectAll(".ui-dataset").style("display", isSymbolic ? "none" : null);
+  d3.selectAll(".dataset-list").style("display", isSymbolic ? "none" : null);
+  d3.selectAll(".ui-symbolicExpression").style("display", isSymbolic ? "block" : "none");
+  d3.select("#symbolic-plot").style("display", isSymbolic ? null : "none");
+  if (!isSymbolic && symbolicPlot) {
+    symbolicPlot.clear();
+    symbolicPlot.setVisible(false);
+  }
+  if (isSymbolic) {
+    let exprInput = document.getElementById("symbolicExpression") as HTMLInputElement;
+    if (exprInput) {
+      exprInput.value = state.symbolicExpression || "";
+    }
+    for (let inputName in INPUTS) {
+      if (!SYMBOLIC_ALLOWED_INPUTS[inputName]) {
+        state[inputName] = false;
+      }
+    }
+    state.x = true;
+  }
 }
 
 let firstInteraction = true;
@@ -1308,7 +1812,7 @@ function userHasInteracted() {
     page = `/v/tutorials/${state.tutorial}`;
   }
   ga('set', 'page', page);
-  ga('send', 'pageview', {'sessionControl': 'start'});
+  ga('send', 'pageview', { 'sessionControl': 'start' });
 }
 
 function simulationStarted() {
@@ -1323,7 +1827,7 @@ function simulationStarted() {
 
 function updateHoverCard(type: HoverType, nodeOrEdge?: kan.KANNode | kan.KANEdge, coordinates?: number[]) {
   let hovercard = d3.select("#hovercard");
-  
+
   if (type == null) {
     // Hide the hover card immediately
     hovercard.style("display", "none");
@@ -1335,49 +1839,48 @@ function updateHoverCard(type: HoverType, nodeOrEdge?: kan.KANNode | kan.KANEdge
     currentHoverCardEdge = null;
     return;
   }
-  
+
   // Position the hover card below the spline chart
   let finalX, finalY;
-  
+
   // For weight hover cards, position below the spline chart
   // Center the hover card horizontally relative to the spline chart
   finalX = coordinates[0] - 150; // Center 300px hover card around spline chart
   finalY = coordinates[1] + (SPLINE_CHART_SIZE / 2) + 10; // Position below spline chart with 10px gap
-  
+
   // Ensure hover card stays within viewport bounds
   // Prevent going off left edge
   if (finalX < 10) {
     finalX = 10;
   }
-  
+
   // Prevent going off right edge (300px hover card width + padding)
   if (finalX + 310 > window.innerWidth) {
     finalX = window.innerWidth - 310;
   }
-  
+
   // Prevent going off bottom edge (200px hover card height + padding)
   if (finalY + 210 > window.innerHeight) {
     // If no room below, position above the spline chart
     finalY = coordinates[1] - (SPLINE_CHART_SIZE / 2) - 210;
   }
-  
-  hovercard.style({
-    "left": finalX + "px",
-    "top": finalY + "px",
-    "display": "block"
-  });
-  
+
+  hovercard
+    .style("left", finalX + "px")
+    .style("top", finalY + "px")
+    .style("display", "block");
+
   // Clear existing content
   hovercard.selectAll("*").remove();
-  
+
   if (type === HoverType.WEIGHT) {
     let edge = nodeOrEdge as kan.KANEdge;
-    
+
     // Create extended SplineChart for learnable function
     let splineContainer = hovercard.append("div")
       .style("padding", "5px");
-    
-    
+
+
 
     // Get the last node id in the network (last layer, last node)
     const lastLayer = network[network.length - 1];
@@ -1390,7 +1893,7 @@ function updateHoverCard(type: HoverType, nodeOrEdge?: kan.KANNode | kan.KANEdge
     let rightText = isDestOutput ? 'Output' : 'Node ' + edge.destNode.id;
 
     let edgeText = `${leftText} → ${rightText}`;
-    
+
     hoverCardSplineChart = new SplineChart(splineContainer, {
       width: 300,
       height: 200,
@@ -1405,7 +1908,7 @@ function updateHoverCard(type: HoverType, nodeOrEdge?: kan.KANNode | kan.KANEdge
       showYAxisValues: true,
       showBorder: false
     });
-    
+
     // Update with the learnable function and track the current edge
     hoverCardSplineChart.updateFunction(edge.learnableFunction);
     currentHoverCardEdge = edge;
@@ -1415,43 +1918,41 @@ function updateHoverCard(type: HoverType, nodeOrEdge?: kan.KANNode | kan.KANEdge
 function addPlusMinusControl(x: number, layerIdx: number) {
   let div = d3.select("#network").append("div")
     .classed("plus-minus-neurons", true)
-    .style({
-      position: "absolute",
-      left: `${x - 15}px`, // Horizontally center the control
-      top: "-60px"  // Move higher to avoid overlap with heatmaps
-    });
+    .style("position", "absolute")
+    .style("left", `${x - 15}px`)
+    .style("top", "-60px");
 
   let i = layerIdx - 1;
   let firstRow = div.append("div").attr("class", `ui-numHiddenLayers`);
   firstRow.append("button")
-      .attr("class", "mdl-button mdl-js-button mdl-button--icon")
-      .on("click", () => {
-        let numNeurons = state.networkShape[i];
-        if (numNeurons >= 8) {
-          return;
-        }
-        state.networkShape[i]++;
-        parametersChanged = true;
-        reset();
-      })
+    .attr("class", "mdl-button mdl-js-button mdl-button--icon")
+    .on("click", () => {
+      let numNeurons = state.networkShape[i];
+      if (numNeurons >= 8) {
+        return;
+      }
+      state.networkShape[i]++;
+      parametersChanged = true;
+      reset();
+    })
     .append("i")
-      .attr("class", "material-icons")
-      .text("add");
+    .attr("class", "material-icons")
+    .text("add");
 
   firstRow.append("button")
-      .attr("class", "mdl-button mdl-js-button mdl-button--icon")
-      .on("click", () => {
-        let numNeurons = state.networkShape[i];
-        if (numNeurons <= 1) {
-          return;
-        }
-        state.networkShape[i]--;
-        parametersChanged = true;
-        reset();
-      })
+    .attr("class", "mdl-button mdl-js-button mdl-button--icon")
+    .on("click", () => {
+      let numNeurons = state.networkShape[i];
+      if (numNeurons <= 1) {
+        return;
+      }
+      state.networkShape[i]--;
+      parametersChanged = true;
+      reset();
+    })
     .append("i")
-      .attr("class", "material-icons")
-      .text("remove");
+    .attr("class", "material-icons")
+    .text("remove");
 
   let suffix = state.networkShape[i] > 1 ? "s" : "";
   firstRow.append("span").text(
@@ -1467,6 +1968,7 @@ function getRelativeHeight(selection: d3.Selection<any>) {
   return node.offsetHeight + node.offsetTop;
 }
 
+updateProblemSpecificUI();
 drawDatasetThumbnails();
 initTutorial();
 makeGUI();

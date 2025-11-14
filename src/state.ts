@@ -19,7 +19,7 @@ import * as dataset from "./dataset";
 const HIDE_STATE_SUFFIX = "_hide";
 
 /** A map between dataset names and functions that generate classification data. */
-export let datasets: {[key: string]: dataset.DataGenerator} = {
+export let datasets: { [key: string]: dataset.DataGenerator } = {
   "circle": dataset.classifyCircleData,
   "xor": dataset.classifyXORData,
   "gauss": dataset.classifyTwoGaussData,
@@ -27,7 +27,7 @@ export let datasets: {[key: string]: dataset.DataGenerator} = {
 };
 
 /** A map between dataset names and functions that generate regression data. */
-export let regDatasets: {[key: string]: dataset.DataGenerator} = {
+export let regDatasets: { [key: string]: dataset.DataGenerator } = {
   "reg-plane": dataset.regressPlane,
   "reg-gauss": dataset.regressGaussian
 };
@@ -70,51 +70,54 @@ export enum Type {
 
 export enum Problem {
   CLASSIFICATION,
-  REGRESSION
+  REGRESSION,
+  SYMBOLIC
 }
 
 export let problems = {
   "classification": Problem.CLASSIFICATION,
-  "regression": Problem.REGRESSION
+  "regression": Problem.REGRESSION,
+  "symbolic": Problem.SYMBOLIC
 };
 
 export interface Property {
   name: string;
   type: Type;
-  keyMap?: {[key: string]: any};
+  keyMap?: { [key: string]: any };
 };
 
 // Add the GUI state.
 export class State {
 
   private static PROPS: Property[] = [
-    {name: "batchSize", type: Type.NUMBER},
-    {name: "dataset", type: Type.OBJECT, keyMap: datasets},
-    {name: "regDataset", type: Type.OBJECT, keyMap: regDatasets},
-    {name: "learningRate", type: Type.NUMBER},
-    {name: "noise", type: Type.NUMBER},
-    {name: "networkShape", type: Type.ARRAY_NUMBER},
-    {name: "seed", type: Type.STRING},
-    {name: "showTestData", type: Type.BOOLEAN},
-    {name: "discretize", type: Type.BOOLEAN},
-    {name: "percTrainData", type: Type.NUMBER},
-    {name: "x", type: Type.BOOLEAN},
-    {name: "y", type: Type.BOOLEAN},
-    {name: "xTimesY", type: Type.BOOLEAN},
-    {name: "xSquared", type: Type.BOOLEAN},
-    {name: "ySquared", type: Type.BOOLEAN},
-    {name: "cosX", type: Type.BOOLEAN},
-    {name: "sinX", type: Type.BOOLEAN},
-    {name: "cosY", type: Type.BOOLEAN},
-    {name: "sinY", type: Type.BOOLEAN},
-    {name: "collectStats", type: Type.BOOLEAN},
-    {name: "tutorial", type: Type.STRING},
-    {name: "problem", type: Type.OBJECT, keyMap: problems},
-    {name: "initZero", type: Type.BOOLEAN},
-    {name: "hideText", type: Type.BOOLEAN},
-    {name: "numControlPoints", type: Type.NUMBER}, // KAN number of control points parameter
-    {name: "degree", type: Type.NUMBER},   // KAN B-spline degree parameter
-    {name: "initNoise", type: Type.STRING}, // KAN initial control point noise parameter
+    { name: "batchSize", type: Type.NUMBER },
+    { name: "dataset", type: Type.OBJECT, keyMap: datasets },
+    { name: "regDataset", type: Type.OBJECT, keyMap: regDatasets },
+    { name: "symbolicExpression", type: Type.STRING },
+    { name: "learningRate", type: Type.NUMBER },
+    { name: "noise", type: Type.NUMBER },
+    { name: "networkShape", type: Type.ARRAY_NUMBER },
+    { name: "seed", type: Type.STRING },
+    { name: "showTestData", type: Type.BOOLEAN },
+    { name: "discretize", type: Type.BOOLEAN },
+    { name: "percTrainData", type: Type.NUMBER },
+    { name: "x", type: Type.BOOLEAN },
+    { name: "y", type: Type.BOOLEAN },
+    { name: "xTimesY", type: Type.BOOLEAN },
+    { name: "xSquared", type: Type.BOOLEAN },
+    { name: "ySquared", type: Type.BOOLEAN },
+    { name: "cosX", type: Type.BOOLEAN },
+    { name: "sinX", type: Type.BOOLEAN },
+    { name: "cosY", type: Type.BOOLEAN },
+    { name: "sinY", type: Type.BOOLEAN },
+    { name: "collectStats", type: Type.BOOLEAN },
+    { name: "tutorial", type: Type.STRING },
+    { name: "problem", type: Type.OBJECT, keyMap: problems },
+    { name: "initZero", type: Type.BOOLEAN },
+    { name: "hideText", type: Type.BOOLEAN },
+    { name: "numControlPoints", type: Type.NUMBER }, // KAN number of control points parameter
+    { name: "degree", type: Type.NUMBER },   // KAN B-spline degree parameter
+    { name: "initNoise", type: Type.STRING }, // KAN initial control point noise parameter
   ];
 
   [key: string]: any;
@@ -146,13 +149,14 @@ export class State {
   sinY = false;
   dataset: dataset.DataGenerator = dataset.classifyCircleData;
   regDataset: dataset.DataGenerator = dataset.regressPlane;
+  symbolicExpression = "sin(PI * x1)";
   seed: string;
 
   /**
    * Deserializes the state from the url hash.
    */
   static deserializeState(): State {
-    let map: {[key: string]: string} = {};
+    let map: { [key: string]: string } = {};
     for (let keyvalue of window.location.hash.slice(1).split("&")) {
       let [name, value] = keyvalue.split("=");
       map[name] = value;
@@ -168,12 +172,12 @@ export class State {
     }
 
     // Deserialize regular properties.
-    State.PROPS.forEach(({name, type, keyMap}) => {
+    State.PROPS.forEach(({ name, type, keyMap }) => {
       switch (type) {
         case Type.OBJECT:
           if (keyMap == null) {
             throw Error("A key-value map must be provided for state " +
-                "variables of type Object");
+              "variables of type Object");
           }
           if (hasKey(name) && map[name] in keyMap) {
             state[name] = keyMap[map[name]];
@@ -187,7 +191,16 @@ export class State {
           break;
         case Type.STRING:
           if (hasKey(name)) {
-            state[name] = map[name];
+            let rawValue = map[name];
+            if (name === "symbolicExpression") {
+              try {
+                state[name] = decodeURIComponent(rawValue);
+              } catch (e) {
+                state[name] = rawValue;
+              }
+            } else {
+              state[name] = rawValue;
+            }
           }
           break;
         case Type.BOOLEAN:
@@ -223,7 +236,7 @@ export class State {
     // Coercion helpers
     const toNum = (v: any, fallback: number): number => {
       const n = typeof v === "string" ? parseFloat(v) :
-                typeof v === "number" ? v : NaN;
+        typeof v === "number" ? v : NaN;
       return isNaN(n) ? fallback : n;
     };
     const toInt = (v: any, fallback: number): number =>
@@ -243,7 +256,7 @@ export class State {
       state.initNoise = rawInit;
     } else {
       const n = typeof rawInit === "string" ? parseFloat(rawInit) :
-                typeof rawInit === "number" ? rawInit : NaN;
+        typeof rawInit === "number" ? rawInit : NaN;
       state.initNoise = isNaN(n) ? 0.3 : n;
     }
 
@@ -256,7 +269,7 @@ export class State {
   serialize() {
     // Serialize regular properties.
     let props: string[] = [];
-    State.PROPS.forEach(({name, type, keyMap}) => {
+    State.PROPS.forEach(({ name, type, keyMap }) => {
       let value = this[name];
       // Don't serialize missing values.
       if (value == null) {
@@ -265,8 +278,10 @@ export class State {
       if (type === Type.OBJECT) {
         value = getKeyFromValue(keyMap, value);
       } else if (type === Type.ARRAY_NUMBER ||
-          type === Type.ARRAY_STRING) {
+        type === Type.ARRAY_STRING) {
         value = value.join(",");
+      } else if (type === Type.STRING && name === "symbolicExpression") {
+        value = encodeURIComponent(value);
       }
       props.push(`${name}=${value}`);
     });

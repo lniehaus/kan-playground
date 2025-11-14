@@ -14,17 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================-->
 <html>
+
 <head lang="en">
   <link rel="icon" type="image/png" href="favicon.png">
   <meta charset="utf-8">
   <meta name="viewport" content="width=1024">
   <meta name="keywords" content="neural networks,machine learning,javascript,kan,kolmogorov arnold networks">
 
-  <meta property="og:type" content="article"/>
-  <meta property="og:title" content="KAN Playground — Kolmogorov-Arnold Network"/>
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content="KAN Playground — Kolmogorov-Arnold Network" />
   <meta property="og:description" content="Tinker with a real Kolmogorov-Arnold Network right here in your browser.">
-  <meta property="og:url" content="http://playground.tensorflow.org"/>
-  <meta property="og:image" content="http://playground.tensorflow.org/preview.png"/>
+  <meta property="og:url" content="http://playground.tensorflow.org" />
+  <meta property="og:image" content="http://playground.tensorflow.org/preview.png" />
 
   <meta name="twitter:card" value="summary_large_image">
   <meta name="twitter:title" content="KAN Playground — Kolmogorov-Arnold Network">
@@ -37,30 +38,37 @@ limitations under the License.
   <meta name="author" content="Lukas Niehaus (Original tensorflow playground by: Daniel Smilkov and Shan Carter)">
   <title>A Kolmogorov-Arnold Network Playground</title>
   <link rel="stylesheet" href="bundle.css" type="text/css">
-  <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500|Material+Icons" rel="stylesheet" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500|Material+Icons" rel="stylesheet"
+    type="text/css">
   <script src="lib.js"></script>
 </head>
+
 <body>
   <!-- GitHub link -->
   <a class="github-link" href="https://github.com/lniehaus/kan-playground" title="Source on GitHub" target="_blank">
-    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 60.5 60.5" width="60" height="60">
-      <polygon class="bg" points="60.5,60.5 0,0 60.5,0 "/>
-      <path class="icon" d="M43.1,5.8c-6.6,0-12,5.4-12,12c0,5.3,3.4,9.8,8.2,11.4c0.6,0.1,0.8-0.3,0.8-0.6c0-0.3,0-1,0-2c-3.3,0.7-4-1.6-4-1.6c-0.5-1.4-1.3-1.8-1.3-1.8c-1.1-0.7,0.1-0.7,0.1-0.7c1.2,0.1,1.8,1.2,1.8,1.2c1.1,1.8,2.8,1.3,3.5,1c0.1-0.8,0.4-1.3,0.8-1.6c-2.7-0.3-5.5-1.3-5.5-5.9c0-1.3,0.5-2.4,1.2-3.2c-0.1-0.3-0.5-1.5,0.1-3.2c0,0,1-0.3,3.3,1.2c1-0.3,2-0.4,3-0.4c1,0,2,0.1,3,0.4c2.3-1.6,3.3-1.2,3.3-1.2c0.7,1.7,0.2,2.9,0.1,3.2c0.8,0.8,1.2,1.9,1.2,3.2c0,4.6-2.8,5.6-5.5,5.9c0.4,0.4,0.8,1.1,0.8,2.2c0,1.6,0,2.9,0,3.3c0,0.3,0.2,0.7,0.8,0.6c4.8-1.6,8.2-6.1,8.2-11.4C55.1,11.2,49.7,5.8,43.1,5.8z"/>
+    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 60.5 60.5"
+      width="60" height="60">
+      <polygon class="bg" points="60.5,60.5 0,0 60.5,0 " />
+      <path class="icon"
+        d="M43.1,5.8c-6.6,0-12,5.4-12,12c0,5.3,3.4,9.8,8.2,11.4c0.6,0.1,0.8-0.3,0.8-0.6c0-0.3,0-1,0-2c-3.3,0.7-4-1.6-4-1.6c-0.5-1.4-1.3-1.8-1.3-1.8c-1.1-0.7,0.1-0.7,0.1-0.7c1.2,0.1,1.8,1.2,1.8,1.2c1.1,1.8,2.8,1.3,3.5,1c0.1-0.8,0.4-1.3,0.8-1.6c-2.7-0.3-5.5-1.3-5.5-5.9c0-1.3,0.5-2.4,1.2-3.2c-0.1-0.3-0.5-1.5,0.1-3.2c0,0,1-0.3,3.3,1.2c1-0.3,2-0.4,3-0.4c1,0,2,0.1,3,0.4c2.3-1.6,3.3-1.2,3.3-1.2c0.7,1.7,0.2,2.9,0.1,3.2c0.8,0.8,1.2,1.9,1.2,3.2c0,4.6-2.8,5.6-5.5,5.9c0.4,0.4,0.8,1.1,0.8,2.2c0,1.6,0,2.9,0,3.3c0,0.3,0.2,0.7,0.8,0.6c4.8-1.6,8.2-6.1,8.2-11.4C55.1,11.2,49.7,5.8,43.1,5.8z" />
     </svg>
   </a>
   <!-- Header -->
   <header>
-    <h1 class="l--page">Tinker With a <b>Kolmogorov-Arnold Network</b> <span class="optional">Right Here </span>in Your Browser.<br>Don't Worry, You Can't Break It. We Promise.</h1>
+    <h1 class="l--page">Tinker With a <b>Kolmogorov-Arnold Network</b> <span class="optional">Right Here </span>in Your
+      Browser.<br>Don't Worry, You Can't Break It. We Promise.</h1>
   </header>
 
   <!-- Top Controls -->
   <div id="top-controls">
     <div class="container l--page">
       <div class="timeline-controls">
-        <button class="mdl-button mdl-js-button mdl-button--icon ui-resetButton" id="reset-button" title="Reset the network">
+        <button class="mdl-button mdl-js-button mdl-button--icon ui-resetButton" id="reset-button"
+          title="Reset the network">
           <i class="material-icons">replay</i>
         </button>
-        <button class="mdl-button mdl-js-button mdl-button--fab mdl-button--colored ui-playButton" id="play-pause-button" title="Run/Pause">
+        <button class="mdl-button mdl-js-button mdl-button--fab mdl-button--colored ui-playButton"
+          id="play-pause-button" title="Run/Pause">
           <i class="material-icons">play_arrow</i>
           <i class="material-icons">pause</i>
         </button>
@@ -131,6 +139,7 @@ limitations under the License.
           <select id="problem">
             <option value="classification">Classification</option>
             <option value="regression">Regression</option>
+            <option value="symbolic">Symbolic Regression</option>
           </select>
         </div>
       </div>
@@ -168,6 +177,19 @@ limitations under the License.
           </div>
         </div>
       </div>
+      <div class="ui-symbolicExpression">
+        <label for="symbolicExpression">Symbolic function f(x)</label>
+        <input id="symbolicExpression" type="text" placeholder="Example: sin(3*x) + 5*x" spellcheck="false"
+          autocomplete="off">
+        <p class="symbolic-helper">Use x as the input variable (aliases: x1, x2, y). Supported functions include sin,
+          cos, tan, exp, log, sqrt, abs, ceil, floor, round, sign and pow.</p>
+        <canvas id="symbolic-thumbnail" width="200" height="100"></canvas>
+        <div id="symbolic-expression-display" class="symbolic-expression-display">
+          <span class="label">Evaluated as:</span>
+          <code id="symbolic-sanitized-expression"></code>
+        </div>
+        <div id="symbolic-error" class="symbolic-error"></div>
+      </div>
       <div>
         <div class="ui-percTrainData">
           <label for="percTrainData">Ratio of training to test data:&nbsp;&nbsp;<span class="value">XX</span>%</label>
@@ -187,9 +209,9 @@ limitations under the License.
             <input class="mdl-slider mdl-js-slider" type="range" id="batchSize" min="1" max="30" step="1">
           </p>
         </div>
-          <button class="basic-button" id="data-regen-button" title="Regenerate data">
-            Regenerate
-          </button>
+        <button class="basic-button" id="data-regen-button" title="Regenerate data">
+          Regenerate
+        </button>
       </div>
     </div>
 
@@ -200,7 +222,8 @@ limitations under the License.
       <div id="network">
         <svg id="svg" width="510" height="450">
           <defs>
-            <marker id="markerArrow" markerWidth="7" markerHeight="13" refX="1" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+            <marker id="markerArrow" markerWidth="7" markerHeight="13" refX="1" refY="6" orient="auto"
+              markerUnits="userSpaceOnUse">
               <path d="M2,11 L7,6 L2,2" />
             </marker>
           </defs>
@@ -208,13 +231,15 @@ limitations under the License.
         <!-- Hover card -->
         <div id="hovercard">
           <div style="font-size:10px">Click anywhere to edit.</div>
-          <div><span class="type">Function/Bias</span> is <span class="value">0.2</span><span><input type="number"/></span>.</div>
+          <div><span class="type">Function/Bias</span> is <span class="value">0.2</span><span><input
+                type="number" /></span>.</div>
         </div>
         <div class="callout thumbnail">
           <svg viewBox="0 0 30 30">
             <defs>
-              <marker id="arrow" markerWidth="5" markerHeight="5" refx="5" refy="2.5" orient="auto" markerUnits="userSpaceOnUse">
-                <path d="M0,0 L5,2.5 L0,5 z"/>
+              <marker id="arrow" markerWidth="5" markerHeight="5" refx="5" refy="2.5" orient="auto"
+                markerUnits="userSpaceOnUse">
+                <path d="M0,0 L5,2.5 L0,5 z" />
               </marker>
             </defs>
             <path d="M12,30C5,20 2,15 12,0" marker-end="url(#arrow)">
@@ -226,14 +251,16 @@ limitations under the License.
         <div class="callout weights">
           <svg viewBox="0 0 30 30">
             <defs>
-              <marker id="arrow" markerWidth="5" markerHeight="5" refx="5" refy="2.5" orient="auto" markerUnits="userSpaceOnUse">
-                <path d="M0,0 L5,2.5 L0,5 z"/>
+              <marker id="arrow" markerWidth="5" markerHeight="5" refx="5" refy="2.5" orient="auto"
+                markerUnits="userSpaceOnUse">
+                <path d="M0,0 L5,2.5 L0,5 z" />
               </marker>
             </defs>
             <path d="M12,30C5,20 2,15 12,0" marker-end="url(#arrow)">
           </svg>
           <div class="label">
-            This is a learnable univariate spline function. The thickness of the lines represents the norm of the spline coefficients.
+            This is a learnable univariate spline function. The thickness of the lines represents the norm of the spline
+            coefficients.
           </div>
         </div>
       </div>
@@ -270,6 +297,7 @@ limitations under the License.
         </div>
         <div id="linechart"></div>
       </div>
+      <div id="symbolic-plot" class="symbolic-plot"></div>
       <div id="heatmap"></div>
       <div style="float:left;margin-top:20px">
         <div style="display:flex; align-items:center;">
@@ -291,7 +319,7 @@ limitations under the License.
             </g>
           </svg>
         </div>
-        <br/>
+        <br />
         <div style="display:flex;">
           <label class="ui-showTestData mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect" for="show-test-data">
             <input type="checkbox" id="show-test-data" class="mdl-checkbox__input" checked>
@@ -319,43 +347,80 @@ limitations under the License.
   <article id="article-text">
     <div class="l--body">
       <h2>Um, What Is a Kolmogorov-Arnold Network?</h2>
-      <p>A Kolmogorov-Arnold Network (KAN) is an alternative to Multi-Layer Perceptrons (MLPs) inspired by the Kolmogorov-Arnold representation theorem. Instead of having fixed weights on edges and learnable activation functions on nodes, KANs have learnable univariate functions on edges and simple summation on nodes. Each edge contains a spline-parameterized function that can learn complex transformations, making KANs potentially more interpretable and parameter-efficient than traditional neural networks. For more details, see the <a href="https://arxiv.org/abs/2404.19756">original KAN paper</a>.</p>
+      <p>A Kolmogorov-Arnold Network (KAN) is an alternative to Multi-Layer Perceptrons (MLPs) inspired by the
+        Kolmogorov-Arnold representation theorem. Instead of having fixed weights on edges and learnable activation
+        functions on nodes, KANs have learnable univariate functions on edges and simple summation on nodes. Each edge
+        contains a spline-parameterized function that can learn complex transformations, making KANs potentially more
+        interpretable and parameter-efficient than traditional neural networks. For more details, see the <a
+          href="https://arxiv.org/abs/2404.19756">original KAN paper</a>.</p>
     </div>
 
     <div class="l--body">
       <h2>How Do KANs Differ from Regular Neural Networks?</h2>
-      <p>Traditional neural networks use linear combinations of inputs (weighted sums) followed by non-linear activation functions. KANs flip this: they apply learnable univariate functions on each edge, then simply sum the results at each node. This design is based on the Kolmogorov-Arnold theorem, which states that any multivariate continuous function can be represented as compositions of continuous univariate functions. The univariate functions in KANs are typically implemented as B-splines with learnable control points.</p>
+      <p>Traditional neural networks use linear combinations of inputs (weighted sums) followed by non-linear activation
+        functions. KANs flip this: they apply learnable univariate functions on each edge, then simply sum the results
+        at each node. This design is based on the Kolmogorov-Arnold theorem, which states that any multivariate
+        continuous function can be represented as compositions of continuous univariate functions. The univariate
+        functions in KANs are typically implemented as B-splines with learnable control points.</p>
     </div>
 
     <div class="l--body">
       <h2>This Is Cool, Can I Repurpose It?</h2>
-      <p>Please do! We've adapted the original <a href="https://playground.tensorflow.org/">TensorFlow Playground</a> to work with Kolmogorov-Arnold Networks. You're free to use it in any way that follows our <a href="https://github.com/lniehaus/kan-playground/blob/master/LICENSE">Apache License</a>. And if you have any suggestions for additions or changes, please <a href="https://github.com/lniehaus/kan-playground/issues">let us know</a>.</p>
-      <p>We've also provided some controls below to enable you tailor the playground to a specific topic or lesson. Just choose which features you'd like to be visible below then save <a class="hide-controls-link" href="#">this link</a>, or <a href="javascript:location.reload();">refresh</a> the page.</p>
+      <p>Please do! We've adapted the original <a href="https://playground.tensorflow.org/">TensorFlow Playground</a> to
+        work with Kolmogorov-Arnold Networks. You're free to use it in any way that follows our <a
+          href="https://github.com/lniehaus/kan-playground/blob/master/LICENSE">Apache License</a>. And if you have any
+        suggestions for additions or changes, please <a href="https://github.com/lniehaus/kan-playground/issues">let us
+          know</a>.</p>
+      <p>We've also provided some controls below to enable you tailor the playground to a specific topic or lesson. Just
+        choose which features you'd like to be visible below then save <a class="hide-controls-link" href="#">this
+          link</a>, or <a href="javascript:location.reload();">refresh</a> the page.</p>
       <div class="hide-controls"></div>
     </div>
 
     <div class="l--body">
       <h2>What Do All the Colors Mean?</h2>
-      <p>Orange and blue are used throughout the visualization in slightly different ways, but in general orange shows negative values while blue shows positive values.</p>
-      <p>The data points (represented by small circles) are initially colored orange or blue, which correspond to positive one and negative one.</p>
-      <p>In the KAN, the lines are colored by the average output values of the learnable functions on each edge. Blue shows positive function outputs, while orange shows negative outputs. The thickness represents the magnitude of the learned function.</p>
-      <p>In the output layer, the dots are colored orange or blue depending on their original values. The background color shows what the network is predicting for a particular area. The intensity of the color shows how confident that prediction is.</p>
+      <p>Orange and blue are used throughout the visualization in slightly different ways, but in general orange shows
+        negative values while blue shows positive values.</p>
+      <p>The data points (represented by small circles) are initially colored orange or blue, which correspond to
+        positive one and negative one.</p>
+      <p>In the KAN, the lines are colored by the average output values of the learnable functions on each edge. Blue
+        shows positive function outputs, while orange shows negative outputs. The thickness represents the magnitude of
+        the learned function.</p>
+      <p>In the output layer, the dots are colored orange or blue depending on their original values. The background
+        color shows what the network is predicting for a particular area. The intensity of the color shows how confident
+        that prediction is.</p>
     </div>
 
     <div class="l--body">
       <h2>What Are the Key Parameters?</h2>
-      <p><b>Learning Rate:</b> Controls how fast the network learns during training. Higher values make the network learn faster but may cause instability or overshooting. Lower values provide more stable training but slower convergence. KANs may require different learning rates than traditional MLPs due to their unique spline-based architecture.</p>
-      <p><b>Spline Degree:</b> Sets the polynomial degree of the B-spline basis functions. Linear (degree 1) creates piecewise linear functions, while higher degrees create smoother curves. Cubic splines (degree 3) are commonly used as they provide a good balance between smoothness and computational efficiency. Higher degrees can capture more complex patterns but may be more prone to overfitting.</p>
-      <p><b>Control Points:</b> Sets how many control points each B-spline function on an edge uses. More control points let the spline capture finer detail but increase compute and memory usage; fewer control points enforce smoother, simpler functions, which can regularize but may underfit complex patterns.</p>
-      <p><b>Init Noise:</b> Controls the initial random values added to the spline coefficients at network initialization. Zero initialization starts with flat functions, while small noise (0.1-0.3) provides gentle random starting points. Larger noise values (0.8-1.0) create more varied initial functions, which can help break symmetry but may make training less stable.</p>     
-      <p><b>Problem Type:</b> Determines the network's output configuration and loss function. Classification problems use categorical outputs with cross-entropy loss for predicting discrete classes (e.g., orange vs. blue points). Regression problems use continuous outputs with mean squared error loss for predicting continuous values (e.g., temperature, price).</p>
+      <p><b>Learning Rate:</b> Controls how fast the network learns during training. Higher values make the network
+        learn faster but may cause instability or overshooting. Lower values provide more stable training but slower
+        convergence. KANs may require different learning rates than traditional MLPs due to their unique spline-based
+        architecture.</p>
+      <p><b>Spline Degree:</b> Sets the polynomial degree of the B-spline basis functions. Linear (degree 1) creates
+        piecewise linear functions, while higher degrees create smoother curves. Cubic splines (degree 3) are commonly
+        used as they provide a good balance between smoothness and computational efficiency. Higher degrees can capture
+        more complex patterns but may be more prone to overfitting.</p>
+      <p><b>Control Points:</b> Sets how many control points each B-spline function on an edge uses. More control points
+        let the spline capture finer detail but increase compute and memory usage; fewer control points enforce
+        smoother, simpler functions, which can regularize but may underfit complex patterns.</p>
+      <p><b>Init Noise:</b> Controls the initial random values added to the spline coefficients at network
+        initialization. Zero initialization starts with flat functions, while small noise (0.1-0.3) provides gentle
+        random starting points. Larger noise values (0.8-1.0) create more varied initial functions, which can help break
+        symmetry but may make training less stable.</p>
+      <p><b>Problem Type:</b> Determines the network's output configuration and loss function. Classification problems
+        use categorical outputs with cross-entropy loss for predicting discrete classes (e.g., orange vs. blue points).
+        Regression problems use continuous outputs with mean squared error loss for predicting continuous values (e.g.,
+        temperature, price).</p>
     </div>
 
     <div class="l--body">
       <h2>Credits</h2>
       <p>
-        This KAN playground is adapted from the original <a href="https://github.com/tensorflow/playground">TensorFlow Playground Repository</a> created by Daniel Smilkov and Shan Carter.
-        The KAN implementation is based on the paper "KAN: Kolmogorov-Arnold Networks" and uses B-spline interpolation for the learnable univariate functions.
+        This KAN playground is adapted from the original <a href="https://github.com/tensorflow/playground">TensorFlow
+          Playground Repository</a> created by Daniel Smilkov and Shan Carter.
+        The KAN implementation is based on the paper "KAN: Kolmogorov-Arnold Networks" and uses B-spline interpolation
+        for the learnable univariate functions.
         Many thanks to the original authors and the KAN research community for their foundational work.
       </p>
     </div>
@@ -376,4 +441,5 @@ limitations under the License.
   <!-- Google analytics -->
   <script src="analytics.js"></script>
 </body>
+
 </html>

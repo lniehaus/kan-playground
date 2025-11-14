@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-import {Example2D} from "./dataset";
+import { Example2D } from "./dataset";
 import * as d3 from 'd3';
 
 export interface HeatMapSettings {
@@ -43,9 +43,9 @@ export class HeatMap {
   private svg;
 
   constructor(
-      width: number, numSamples: number, xDomain: [number, number],
-      yDomain: [number, number], container,
-      userSettings?: HeatMapSettings) {
+    width: number, numSamples: number, xDomain: [number, number],
+    yDomain: [number, number], container,
+    userSettings?: HeatMapSettings) {
     this.numSamples = numSamples;
     let height = width;
     let padding = userSettings.showAxes ? 30 : 0;
@@ -67,9 +67,9 @@ export class HeatMap {
 
     // Get a range of colors.
     let tmpScale = d3.scale.linear<string, number>()
-        .domain([0, .5, 1])
-        .range(["#f59322", "#e8eaeb", "#0877bd"])
-        .clamp(true);
+      .domain([0, .5, 1])
+      .range(["#f59322", "#e8eaeb", "#0877bd"])
+      .clamp(true);
     // Due to numerical error, we need to specify
     // d3.range(0, end + small_epsilon, step)
     // in order to guarantee that we will have end/step entries with
@@ -78,8 +78,8 @@ export class HeatMap {
       return tmpScale(a);
     });
     this.color = d3.scale.quantize()
-                     .domain([-1, 1])
-                     .range(colors);
+      .domain([-1, 1])
+      .range(colors);
 
     container = container.append("div")
       .style({
@@ -100,8 +100,8 @@ export class HeatMap {
 
     if (!this.settings.noSvg) {
       this.svg = container.append("svg").attr({
-          "width": width,
-          "height": height
+        "width": width,
+        "height": height
       }).style({
         // Overlay the svg on top of the canvas.
         "position": "absolute",
@@ -155,8 +155,8 @@ export class HeatMap {
 
     if (dx !== this.numSamples || dy !== this.numSamples) {
       throw new Error(
-          "The provided data matrix must be of size " +
-          "numSamples X numSamples");
+        "The provided data matrix must be of size " +
+        "numSamples X numSamples");
     }
 
     // Compute the pixel colors; scaled by CSS.
@@ -213,7 +213,7 @@ export function reduceMatrix(matrix: number[][], factor: number): number[][] {
   }
   if (matrix.length % factor !== 0) {
     throw new Error("The width/height of the matrix must be divisible by " +
-        "the reduction factor");
+      "the reduction factor");
   }
   let result: number[][] = new Array(matrix.length / factor);
   for (let i = 0; i < matrix.length; i += factor) {

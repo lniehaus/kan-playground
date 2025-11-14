@@ -51,7 +51,7 @@ export class SplineChart {
     width: 300,
     height: 200
   };
-  
+
   protected svg: any;
   protected xScale: any;
   protected yScale: any;
@@ -89,7 +89,7 @@ export class SplineChart {
     if (this.settings.showYAxisLabels && this.settings.showYAxisValues) {
       this.margin.left = 50;
     } else if (this.settings.showYAxisLabels || this.settings.showYAxisValues) {
-      this.margin.left = 30; 
+      this.margin.left = 30;
     }
 
     // Reduce right margin when no additional right-side content is needed
@@ -100,9 +100,9 @@ export class SplineChart {
 
     // Extend bottom margin if x-axis elements are shown
     if (this.settings.showXAxisLabels && this.settings.showXAxisValues) {
-      this.margin.bottom = 40; 
+      this.margin.bottom = 40;
     } else if (this.settings.showXAxisLabels || this.settings.showXAxisValues) {
-      this.margin.bottom = 30; 
+      this.margin.bottom = 30;
     }
 
     // Reduce top margin if title exists
@@ -217,16 +217,16 @@ export class SplineChart {
         "box-shadow": "0 2px 5px rgba(0,0,0,0.2)",
         "transition": "all 0.2s ease"
       });
-      
+
       // Add hover effects
       this.chartContainer
-        .on("mouseenter", function() {
+        .on("mouseenter", function () {
           d3.select(this).style({
             "opacity": "1.0",
             "border": "2px solid #666"
           });
         })
-        .on("mouseleave", function() {
+        .on("mouseleave", function () {
           d3.select(this).style({
             "opacity": null,
             "border": "2px solid black"
@@ -239,7 +239,7 @@ export class SplineChart {
         "box-shadow": "none",
         "transition": null
       });
-      
+
       // Remove hover effects
       this.chartContainer
         .on("mouseenter", null)
@@ -339,15 +339,15 @@ export class SplineChart {
    */
   updateFunction(learnableFunction: LearnableFunction): void {
     this.currentFunction = learnableFunction;
-    
+
     // Update Y scale based on function range
     this.updateYScale();
-    
+
     // Clear previous function visualization
     this.svg.selectAll(".spline-curve").remove();
     this.svg.selectAll(".control-point").remove();
     this.svg.selectAll(".knot-line").remove();
-    
+
     // Clear old control paths only if showOldControlPaths is false
     if (!this.settings.showOldControlPaths) {
       this.svg.selectAll(".control-polygon").remove();
@@ -485,8 +485,8 @@ export class SplineChart {
 
       // Create a unique class for the current control polygon
       const timestamp = Date.now();
-      const polygonClass = this.settings.showOldControlPaths ? 
-        `control-polygon control-polygon-${timestamp}` : 
+      const polygonClass = this.settings.showOldControlPaths ?
+        `control-polygon control-polygon-${timestamp}` :
         "control-polygon";
 
       this.svg.append("path")
@@ -503,7 +503,7 @@ export class SplineChart {
       if (this.settings.showOldControlPaths) {
         // Fade older paths
         this.svg.selectAll(".control-polygon")
-          .filter(function() {
+          .filter(function () {
             return !d3.select(this).classed(`control-polygon-${timestamp}`);
           })
           .transition()
@@ -559,14 +559,14 @@ export class SplineChart {
    */
   updateSettings(newSettings: SplineChartSettings): void {
     const oldSettings = { ...this.settings };
-    
+
     for (let prop in newSettings) {
       this.settings[prop] = newSettings[prop];
     }
 
     // Check if margin-affecting settings changed
     const marginAffectingSettings = ['showYAxisLabels', 'showYAxisValues', 'showXAxisLabels', 'showXAxisValues', 'title'];
-    const needsRecreation = marginAffectingSettings.some(setting => 
+    const needsRecreation = marginAffectingSettings.some(setting =>
       setting in newSettings && oldSettings[setting] !== newSettings[setting]
     );
 
@@ -658,12 +658,12 @@ export class SplineChart {
   /**
    * Export the current function as data points
    */
-  exportData(numPoints: number = 100): Array<{x: number, y: number}> {
+  exportData(numPoints: number = 100): Array<{ x: number, y: number }> {
     if (!this.currentFunction) {
       return [];
     }
 
-    const data: Array<{x: number, y: number}> = [];
+    const data: Array<{ x: number, y: number }> = [];
     for (let i = 0; i <= numPoints; i++) {
       const x = -1 + (2 * i) / numPoints;
       const y = this.currentFunction.evaluate(x);
@@ -689,7 +689,7 @@ export class SplineChart {
 
     const data = this.exportData(200);
     const values = data.map(d => d.y);
-    
+
     return {
       min: Math.min(...values),
       max: Math.max(...values),
@@ -704,7 +704,7 @@ export class SplineChart {
  * Multi-function spline chart for comparing multiple learnable functions
  */
 export class MultiSplineChart extends SplineChart {
-  private functions: {[id: string]: LearnableFunction} = {};
+  private functions: { [id: string]: LearnableFunction } = {};
   private colors: string[] = ["#2196F3", "#FF5722", "#4CAF50", "#FF9800", "#9C27B0", "#00BCD4"];
   /**
    * Add or update a function
@@ -774,7 +774,7 @@ export class MultiSplineChart extends SplineChart {
 
     // Update scale and axis
     this.yScale.domain([minY, maxY]);
-    
+
     let yAxis = d3.svg.axis()
       .scale(this.yScale)
       .orient("left");
