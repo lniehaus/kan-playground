@@ -108,6 +108,58 @@ let INPUTS: { [name: string]: InputFeature } = {
   "sinY": { f: (x, y) => Math.sin(y), label: "sin(X_2)" },
 };
 
+type SymbolicCurvePoint = {
+  x: number;
+  y: number;
+};
+
+type SymbolicLibraryEntry = {
+  id: string;
+  label: string;
+  expression: string;
+  evaluator: (x: number) => number;
+};
+
+type SymbolicLibraryBasisResult = {
+  entry: SymbolicLibraryEntry;
+  coefficient: number;
+  samples: SymbolicCurvePoint[];
+  color: string;
+};
+
+type SymbolicLibraryFit = {
+  combined: SymbolicCurvePoint[];
+  basis: SymbolicLibraryBasisResult[];
+  rmse: number;
+};
+
+const SYMBOLIC_LIBRARY_COLORS = [
+  "#4caf50",
+  "#8e24aa",
+  "#00897b",
+  "#ff7043",
+  "#5c6bc0",
+  "#f06292",
+  "#26c6da",
+  "#7cb342"
+];
+
+const SYMBOLIC_LIBRARY_COMBINED_COLOR = "#388e3c";
+const SYMBOLIC_LIBRARY_REGULARIZATION = 1e-6;
+
+const SYMBOLIC_LIBRARY_ENTRIES: SymbolicLibraryEntry[] = [
+  { id: "const", label: "1", expression: "1", evaluator: () => 1 },
+  { id: "x", label: "x", expression: "x", evaluator: x => x },
+  { id: "x2", label: "x²", expression: "x^2", evaluator: x => x * x },
+  { id: "x3", label: "x³", expression: "x^3", evaluator: x => x * x * x },
+  { id: "sin", label: "sin(x)", expression: "sin(x)", evaluator: x => Math.sin(x) },
+  { id: "cos", label: "cos(x)", expression: "cos(x)", evaluator: x => Math.cos(x) },
+  { id: "exp", label: "exp(x)", expression: "exp(x)", evaluator: x => Math.exp(x) },
+  { id: "abs", label: "|x|", expression: "|x|", evaluator: x => Math.abs(x) }
+];
+
+let symbolicLibraryFit: SymbolicLibraryFit | null = null;
+
 let HIDABLE_CONTROLS = [
   ["Show test data", "showTestData"],
   ["Discretize output", "discretize"],
@@ -145,6 +197,8 @@ class SymbolicPlot {
   private yAxis: d3.svg.Axis;
   private targetPath: d3.Selection<any>;
   private predictedPath: d3.Selection<any>;
+  private libraryPath: d3.Selection<any>;
+  private basisGroup: d3.Selection<any>;
   private trainGroup: d3.Selection<any>;
   private testGroup: d3.Selection<any>;
 
@@ -213,35 +267,31 @@ class SymbolicPlot {
 
     let legend = this.svg.append("g")
       .attr("class", "symbolic-legend")
-      .attr("transform", `translate(${Math.max(0, this.width - 170)}, ${this.height + 6})`);
+      .attr("transform", `translate(${Math.max(0, this.width - 160)}, ${this.height + 6})`);
 
-    legend.append("line")
-      .attr("x1", 0)
-      .attr("x2", 18)
-      .attr("y1", 6)
-      .attr("y2", 6)
-      .style("stroke", "#0877bd")
-      .style("stroke-width", "3px");
+    let legendItems = [
+      { label: "Ground truth", color: "#0877bd", dash: "" },
+      { label: "Prediction", color: "#f59322", dash: "6,3" },
+      { label: "Library fit", color: SYMBOLIC_LIBRARY_COMBINED_COLOR, dash: "4,2" }
+    ];
 
-    legend.append("text")
-      .attr("x", 22)
-      .attr("y", 9)
-      .style("font-size", "10px")
-      .text("Ground truth");
-
-    legend.append("line")
-      .attr("x1", 98)
-      .attr("x2", 116)
-      .attr("y1", 6)
-      .attr("y2", 6)
-      .style("stroke", "#f59322")
-      .style("stroke-width", "3px");
-
-    legend.append("text")
-      .attr("x", 120)
-      .attr("y", 9)
-      .style("font-size", "10px")
-      .text("Prediction");
+    legendItems.forEach((item, idx) => {
+      let group = legend.append("g")
+        .attr("transform", `translate(0, ${idx * 14})`);
+      group.append("line")
+        .attr("x1", 0)
+        .attr("x2", 18)
+        .attr("y1", 6)
+        .attr("y2", 6)
+        .style("stroke", item.color)
+        .style("stroke-width", "3px")
+        .style("stroke-dasharray", item.dash);
+      group.append("text")
+        .attr("x", 22)
+        .attr("y", 9)
+        .style("font-size", "10px")
+        .text(item.label);
+    });
 
     this.targetPath = this.svg.append("path")
       .attr("class", "symbolic-target")
@@ -255,6 +305,17 @@ class SymbolicPlot {
       .style("stroke", "#f59322")
       .style("stroke-width", "2px")
       .style("stroke-dasharray", "6,3");
+
+    this.basisGroup = this.svg.append("g")
+      .attr("class", "symbolic-library-basis");
+
+    this.libraryPath = this.svg.append("path")
+      .attr("class", "symbolic-library-line")
+      .style("fill", "none")
+      .style("stroke", SYMBOLIC_LIBRARY_COMBINED_COLOR)
+      .style("stroke-width", "2px")
+      .style("stroke-dasharray", "4,2")
+      .style("opacity", 0);
 
     this.trainGroup = this.svg.append("g")
       .attr("class", "symbolic-train");
@@ -270,11 +331,13 @@ class SymbolicPlot {
   clear(): void {
     this.targetPath.attr("d", "");
     this.predictedPath.attr("d", "");
+    this.libraryPath.attr("d", "").style("opacity", 0);
+    this.basisGroup.selectAll("path").remove();
     this.trainGroup.selectAll("circle").remove();
     this.testGroup.selectAll("circle").remove();
   }
 
-  update(samples: SymbolicSample[], train: Example2D[], test: Example2D[], scale: number): void {
+  update(samples: SymbolicSample[], train: Example2D[], test: Example2D[], scale: number, fit?: SymbolicLibraryFit | null): void {
     if (!samples || samples.length === 0) {
       this.clear();
       return;
@@ -285,6 +348,10 @@ class SymbolicPlot {
       yValues.push(sample.target);
       yValues.push(sample.predicted);
     });
+    if (fit && fit.combined && fit.combined.length) {
+      fit.combined.forEach(point => yValues.push(point.y));
+      fit.basis.forEach(b => b.samples.forEach(point => yValues.push(point.y)));
+    }
     if (train) {
       train.forEach(point => yValues.push(point.label * scale));
     }
@@ -321,6 +388,41 @@ class SymbolicPlot {
 
     this.targetPath.datum(samples).attr("d", targetLine);
     this.predictedPath.datum(samples).attr("d", predictedLine);
+
+    if (fit && fit.combined && fit.combined.length) {
+      let combinedLine = d3.svg.line<SymbolicCurvePoint>()
+        .x(d => this.xScale(d.x))
+        .y(d => this.yScale(d.y))
+        .interpolate("basis");
+      this.libraryPath
+        .datum(fit.combined)
+        .attr("d", combinedLine)
+        .style("opacity", 1);
+
+      let basisLine = d3.svg.line<SymbolicCurvePoint>()
+        .x(d => this.xScale(d.x))
+        .y(d => this.yScale(d.y))
+        .interpolate("basis");
+
+      let basisSelection = this.basisGroup.selectAll("path")
+        .data(fit.basis, (d: any) => d.entry.id);
+
+      basisSelection.enter().append("path")
+        .attr("class", "symbolic-library-basis-line")
+        .style("fill", "none")
+        .style("stroke-width", "1.5px")
+        .style("stroke-dasharray", "2,2")
+        .style("opacity", 0.7);
+
+      basisSelection
+        .style("stroke", (d: SymbolicLibraryBasisResult) => d.color)
+        .attr("d", (d: SymbolicLibraryBasisResult) => basisLine(d.samples));
+
+      basisSelection.exit().remove();
+    } else {
+      this.libraryPath.attr("d", "").style("opacity", 0);
+      this.basisGroup.selectAll("path").remove();
+    }
 
     let trainSelection = this.trainGroup.selectAll("circle").data(train || []);
     trainSelection.enter().append("circle")
@@ -649,6 +751,9 @@ function makeGUI() {
     });
     symbolicExpressionInput.property("value", state.symbolicExpression || "");
   }
+
+  initSymbolicLibraryUI();
+  updateSymbolicLibraryFit();
 
   // numControlPoints UI
   let numControlPointsSel = d3.select("#numControlPoints").on("change", function (this: HTMLSelectElement) {
@@ -1579,11 +1684,15 @@ function generateData(firstTime = false, options: { allowSymbolicFallback?: bool
       allowFallback);
     updateSymbolicExpressionFeedback();
     if (!symbolicResult || !symbolicResult.isValid) {
+      symbolicLibraryFit = null;
+      refreshSymbolicLibraryUI();
       return false;
     }
+    updateSymbolicLibraryFit();
     data = symbolicResult.data;
   } else {
     symbolicResult = null;
+    symbolicLibraryFit = null;
     numSamples = (state.problem === Problem.REGRESSION) ?
       NUM_SAMPLES_REGRESS : NUM_SAMPLES_CLASSIFY;
     let generator = state.problem === Problem.CLASSIFICATION ?
@@ -1772,7 +1881,339 @@ function updateSymbolicPlot(): void {
     const predicted = predictedNormalized * scale;
     samples.push({ x, target, predicted });
   }
-  plot.update(samples, trainData, testData, scale);
+  const fit = (symbolicResult && symbolicResult.isValid) ? symbolicLibraryFit : null;
+  plot.update(samples, trainData, testData, scale, fit);
+}
+
+function initSymbolicLibraryUI(): void {
+  renderSymbolicLibraryCatalog();
+  renderSymbolicLibrarySelection();
+}
+
+function getSymbolicLibraryEntry(id: string): SymbolicLibraryEntry | undefined {
+  for (let i = 0; i < SYMBOLIC_LIBRARY_ENTRIES.length; i++) {
+    if (SYMBOLIC_LIBRARY_ENTRIES[i].id === id) {
+      return SYMBOLIC_LIBRARY_ENTRIES[i];
+    }
+  }
+  return undefined;
+}
+
+function getSymbolicLibraryColor(id: string): string {
+  let index = 0;
+  for (let i = 0; i < SYMBOLIC_LIBRARY_ENTRIES.length; i++) {
+    if (SYMBOLIC_LIBRARY_ENTRIES[i].id === id) {
+      index = i;
+      break;
+    }
+  }
+  return SYMBOLIC_LIBRARY_COLORS[index % SYMBOLIC_LIBRARY_COLORS.length];
+}
+
+function isLibrarySelected(id: string): boolean {
+  return Array.isArray(state.symbolicLibrarySelection) &&
+    state.symbolicLibrarySelection.indexOf(id) !== -1;
+}
+
+function renderSymbolicLibraryCatalog(): void {
+  let container = d3.select("#symbolic-library");
+  if (container.empty()) {
+    return;
+  }
+  let items = container.selectAll("button.symbolic-library-item")
+    .data(SYMBOLIC_LIBRARY_ENTRIES, (d: any) => d.id);
+
+  let enterSel = items.enter().append("button")
+    .attr("type", "button")
+    .attr("class", "symbolic-library-item")
+    .on("click", function (d: SymbolicLibraryEntry) {
+      toggleSymbolicLibraryEntry(d.id);
+    });
+
+  enterSel.append("span")
+    .attr("class", "symbolic-library-chip");
+
+  enterSel.append("span")
+    .attr("class", "symbolic-library-item-label");
+
+  items
+    .classed("is-selected", (d: SymbolicLibraryEntry) => isLibrarySelected(d.id))
+    .attr("title", (d: SymbolicLibraryEntry) => d.expression);
+
+  items.select(".symbolic-library-chip")
+    .style("background-color", (d: SymbolicLibraryEntry) => getSymbolicLibraryColor(d.id));
+
+  items.select(".symbolic-library-item-label")
+    .text((d: SymbolicLibraryEntry) => d.label);
+
+  items.exit().remove();
+}
+
+function renderSymbolicLibrarySelection(): void {
+  let container = d3.select("#symbolic-library-selected");
+  if (container.empty()) {
+    return;
+  }
+  container.selectAll("*").remove();
+
+  let selectedIds = Array.isArray(state.symbolicLibrarySelection) ?
+    state.symbolicLibrarySelection : [];
+
+  if (!selectedIds.length) {
+    container.append("div")
+      .attr("class", "symbolic-library-empty")
+      .text("Select functions to build a fit.");
+    return;
+  }
+
+  let coefficientMap: { [key: string]: number } = {};
+  if (symbolicLibraryFit && symbolicLibraryFit.basis) {
+    symbolicLibraryFit.basis.forEach(entry => {
+      coefficientMap[entry.entry.id] = entry.coefficient;
+    });
+  }
+
+  selectedIds.forEach(id => {
+    let entry = getSymbolicLibraryEntry(id);
+    if (!entry) {
+      return;
+    }
+    let coeff = coefficientMap[id];
+    let row = container.append("div")
+      .attr("class", "symbolic-library-row");
+    row.append("span")
+      .attr("class", "symbolic-library-color")
+      .style("background-color", getSymbolicLibraryColor(id));
+
+    let labelCell = row.append("div")
+      .attr("class", "symbolic-library-label");
+    labelCell.text(entry.label);
+    labelCell.append("span")
+      .attr("class", "symbolic-library-expression")
+      .text(entry.expression);
+
+    row.append("span")
+      .attr("class", "symbolic-library-coefficient")
+      .text((coeff != null && isFinite(coeff)) ? formatLibraryNumber(coeff) : "—");
+
+    row.append("button")
+      .attr("type", "button")
+      .attr("class", "symbolic-library-remove")
+      .text("Remove")
+      .on("click", () => removeSymbolicLibraryEntry(id));
+  });
+
+  if (symbolicLibraryFit && symbolicLibraryFit.combined && symbolicLibraryFit.combined.length) {
+    container.append("div")
+      .attr("class", "symbolic-library-rmse")
+      .text(`RMSE: ${formatLibraryNumber(symbolicLibraryFit.rmse)}`);
+  }
+}
+
+function refreshSymbolicLibraryUI(): void {
+  renderSymbolicLibraryCatalog();
+  renderSymbolicLibrarySelection();
+}
+
+function toggleSymbolicLibraryEntry(id: string): void {
+  if (!Array.isArray(state.symbolicLibrarySelection)) {
+    state.symbolicLibrarySelection = [];
+  }
+  let next = state.symbolicLibrarySelection.slice();
+  let index = next.indexOf(id);
+  if (index >= 0) {
+    next.splice(index, 1);
+  } else {
+    next.push(id);
+  }
+  state.symbolicLibrarySelection = next;
+  state.serialize();
+  userHasInteracted();
+  updateSymbolicLibraryFit();
+  updateSymbolicPlot();
+}
+
+function removeSymbolicLibraryEntry(id: string): void {
+  if (!Array.isArray(state.symbolicLibrarySelection)) {
+    return;
+  }
+  let next = state.symbolicLibrarySelection.filter(item => item !== id);
+  if (next.length === state.symbolicLibrarySelection.length) {
+    return;
+  }
+  state.symbolicLibrarySelection = next;
+  state.serialize();
+  userHasInteracted();
+  updateSymbolicLibraryFit();
+  updateSymbolicPlot();
+}
+
+function updateSymbolicLibraryFit(): void {
+  if (state.problem !== Problem.SYMBOLIC || !symbolicResult || !symbolicResult.isValid) {
+    symbolicLibraryFit = null;
+    refreshSymbolicLibraryUI();
+    return;
+  }
+  let selectedIds = Array.isArray(state.symbolicLibrarySelection) ?
+    state.symbolicLibrarySelection.filter(id => !!getSymbolicLibraryEntry(id)) : [];
+  if (selectedIds.length === 0) {
+    symbolicLibraryFit = null;
+    refreshSymbolicLibraryUI();
+    return;
+  }
+  let entries = selectedIds.map(id => getSymbolicLibraryEntry(id)!)
+    .filter((entry): entry is SymbolicLibraryEntry => !!entry);
+  symbolicLibraryFit = computeSymbolicLibraryFit(entries, symbolicResult);
+  refreshSymbolicLibraryUI();
+}
+
+function computeSymbolicLibraryFit(entries: SymbolicLibraryEntry[], result: SymbolicDatasetResult): SymbolicLibraryFit | null {
+  if (!entries.length || !result || !result.evaluator) {
+    return null;
+  }
+  let xs: number[] = [];
+  let target: number[] = [];
+  for (let i = 0; i < SYMBOLIC_PREVIEW_SAMPLES; i++) {
+    const x = -1 + (2 * i) / Math.max(1, SYMBOLIC_PREVIEW_SAMPLES - 1);
+    xs.push(x);
+    let value = safeLibraryValue(result.evaluator(x));
+    target.push(value);
+  }
+
+  let design = entries.map(entry => xs.map(x => safeLibraryValue(entry.evaluator(x))));
+  let n = entries.length;
+  let ata: number[][] = [];
+  let atb: number[] = [];
+  for (let i = 0; i < n; i++) {
+    ata[i] = new Array(n);
+    for (let j = 0; j < n; j++) {
+      ata[i][j] = 0;
+    }
+    atb[i] = 0;
+  }
+
+  for (let row = 0; row < xs.length; row++) {
+    let t = target[row];
+    for (let i = 0; i < n; i++) {
+      let vi = design[i][row];
+      atb[i] += vi * t;
+      for (let j = 0; j < n; j++) {
+        ata[i][j] += vi * design[j][row];
+      }
+    }
+  }
+
+  for (let i = 0; i < n; i++) {
+    ata[i][i] += SYMBOLIC_LIBRARY_REGULARIZATION;
+  }
+
+  let coefficients = solveLinearSystem(ata, atb);
+  if (!coefficients) {
+    return null;
+  }
+
+  let combined: SymbolicCurvePoint[] = xs.map((x, idx) => {
+    let y = 0;
+    for (let j = 0; j < n; j++) {
+      y += coefficients[j] * design[j][idx];
+    }
+    return { x, y };
+  });
+
+  let basis: SymbolicLibraryBasisResult[] = entries.map((entry, idx) => {
+    return {
+      entry,
+      coefficient: coefficients[idx],
+      samples: xs.map((x, sampleIdx) => ({
+        x,
+        y: coefficients[idx] * design[idx][sampleIdx]
+      })),
+      color: getSymbolicLibraryColor(entry.id)
+    };
+  });
+
+  let mse = 0;
+  for (let idx = 0; idx < combined.length; idx++) {
+    let diff = combined[idx].y - target[idx];
+    mse += diff * diff;
+  }
+  let rmse = combined.length ? Math.sqrt(mse / combined.length) : 0;
+
+  return { combined, basis, rmse };
+}
+
+function solveLinearSystem(matrix: number[][], vector: number[]): number[] | null {
+  let n = vector.length;
+  if (n === 0) {
+    return [];
+  }
+  let aug: number[][] = matrix.map((row, i) => {
+    let copy = row.slice();
+    copy.push(vector[i]);
+    return copy;
+  });
+
+  for (let col = 0; col < n; col++) {
+    let pivotRow = col;
+    let pivotVal = Math.abs(aug[col][col]);
+    for (let row = col + 1; row < n; row++) {
+      let testVal = Math.abs(aug[row][col]);
+      if (testVal > pivotVal) {
+        pivotVal = testVal;
+        pivotRow = row;
+      }
+    }
+    if (pivotVal < 1e-12) {
+      return null;
+    }
+    if (pivotRow !== col) {
+      let tmp = aug[col];
+      aug[col] = aug[pivotRow];
+      aug[pivotRow] = tmp;
+    }
+
+    let pivot = aug[col][col];
+    for (let k = col; k <= n; k++) {
+      aug[col][k] /= pivot;
+    }
+
+    for (let row = 0; row < n; row++) {
+      if (row === col) {
+        continue;
+      }
+      let factor = aug[row][col];
+      if (factor === 0) {
+        continue;
+      }
+      for (let k = col; k <= n; k++) {
+        aug[row][k] -= factor * aug[col][k];
+      }
+    }
+  }
+
+  let solution: number[] = new Array(n);
+  for (let i = 0; i < n; i++) {
+    solution[i] = aug[i][n];
+  }
+  return solution;
+}
+
+function safeLibraryValue(value: number): number {
+  if (!isFinite(value) || isNaN(value)) {
+    return 0;
+  }
+  return value;
+}
+
+function formatLibraryNumber(value: number): string {
+  if (!isFinite(value)) {
+    return "—";
+  }
+  let absVal = Math.abs(value);
+  if (absVal >= 1000 || (absVal > 0 && absVal < 1e-3)) {
+    return value.toExponential(2);
+  }
+  return value.toFixed(3);
 }
 
 function updateProblemSpecificUI(): void {
@@ -1780,7 +2221,8 @@ function updateProblemSpecificUI(): void {
   d3.selectAll(".ui-dataset").style("display", isSymbolic ? "none" : null);
   d3.selectAll(".dataset-list").style("display", isSymbolic ? "none" : null);
   d3.selectAll(".ui-symbolicExpression").style("display", isSymbolic ? "block" : "none");
-  d3.select("#symbolic-plot").style("display", isSymbolic ? null : "none");
+  d3.select("#symbolic-plot").style("display", isSymbolic ? "block" : "none");
+  d3.select("#symbolic-library-panel").style("display", isSymbolic ? "block" : "none");
   if (!isSymbolic && symbolicPlot) {
     symbolicPlot.clear();
     symbolicPlot.setVisible(false);
@@ -1797,6 +2239,7 @@ function updateProblemSpecificUI(): void {
     }
     state.x = true;
   }
+  refreshSymbolicLibraryUI();
 }
 
 let firstInteraction = true;

@@ -94,6 +94,7 @@ export class State {
     { name: "dataset", type: Type.OBJECT, keyMap: datasets },
     { name: "regDataset", type: Type.OBJECT, keyMap: regDatasets },
     { name: "symbolicExpression", type: Type.STRING },
+    { name: "symbolicLibrarySelection", type: Type.ARRAY_STRING },
     { name: "learningRate", type: Type.NUMBER },
     { name: "noise", type: Type.NUMBER },
     { name: "networkShape", type: Type.ARRAY_NUMBER },
@@ -150,6 +151,7 @@ export class State {
   dataset: dataset.DataGenerator = dataset.classifyCircleData;
   regDataset: dataset.DataGenerator = dataset.regressPlane;
   symbolicExpression = "sin(PI * x1)";
+  symbolicLibrarySelection: string[] = ["x", "sin"];
   seed: string;
 
   /**
@@ -258,6 +260,17 @@ export class State {
       const n = typeof rawInit === "string" ? parseFloat(rawInit) :
         typeof rawInit === "number" ? rawInit : NaN;
       state.initNoise = isNaN(n) ? 0.3 : n;
+    }
+
+    if (!Array.isArray((state as any).symbolicLibrarySelection)) {
+      state.symbolicLibrarySelection = ["x", "sin"];
+    } else {
+      state.symbolicLibrarySelection = (state as any).symbolicLibrarySelection
+        .map((id: any) => typeof id === "string" ? id.trim() : "")
+        .filter((id: string) => id.length > 0);
+      if (state.symbolicLibrarySelection.length === 0) {
+        state.symbolicLibrarySelection = ["x", "sin"];
+      }
     }
 
     return state;

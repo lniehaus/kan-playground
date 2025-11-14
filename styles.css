@@ -1114,6 +1114,152 @@ footer .links a:hover {
   margin: 6px 0 10px 0;
 }
 
+.symbolic-library {
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: #fdfdfd;
+  padding: 10px;
+  margin: 10px 0 14px 0;
+}
+
+.symbolic-library-panel {
+  display: none;
+  margin-top: 18px;
+}
+
+.symbolic-library-panel h5 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.symbolic-library-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: #444;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.symbolic-library-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.symbolic-library-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 14px;
+  border: 1px solid #d6d6d6;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.symbolic-library-item:hover {
+  border-color: #4caf50;
+}
+
+.symbolic-library-item.is-selected {
+  background: rgba(76, 175, 80, 0.12);
+  border-color: #4caf50;
+  color: #2e7d32;
+}
+
+.symbolic-library-item .symbolic-library-chip {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.symbolic-library-selected {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.symbolic-library-row {
+  display: grid;
+  grid-template-columns: 14px 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 12px;
+}
+
+.symbolic-library-row:last-child {
+  border-bottom: none;
+}
+
+.symbolic-library-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.symbolic-library-label {
+  font-weight: 500;
+  color: #444;
+}
+
+.symbolic-library-expression {
+  display: block;
+  font-family: "Courier New", monospace;
+  font-size: 11px;
+  color: #666;
+}
+
+.symbolic-library-coefficient {
+  font-family: "Courier New", monospace;
+  font-size: 12px;
+  color: #333;
+}
+
+.symbolic-library-remove {
+  border: none;
+  background: none;
+  color: #b23b3b;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.symbolic-library-remove:hover {
+  background: rgba(178, 59, 59, 0.12);
+}
+
+.symbolic-library-empty {
+  font-size: 12px;
+  color: #777;
+}
+
+.symbolic-library-note {
+  font-size: 11px;
+  color: #777;
+}
+
+.symbolic-library-rmse {
+  font-size: 11px;
+  color: #555;
+  font-family: "Courier New", monospace;
+}
+
+.symbolic-library-basis-line {
+  pointer-events: none;
+}
+
 #symbolic-thumbnail {
   width: 100%;
   height: 100px;
