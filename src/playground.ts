@@ -50,7 +50,8 @@ const RECT_SIZE = 30;
 const NUM_SAMPLES_CLASSIFY = 500;
 const NUM_SAMPLES_REGRESS = 1200;
 const DENSITY = 100;
-const SPLINE_CHART_SIZE = 30;
+const SPLINE_CHART_SIZE_X = 40;
+const SPLINE_CHART_SIZE_Y = 30;
 
 // Helper: populate numControlPoints options based on degree
 function updateNumControlPointsOptionsForDegree(degreeVal: number, currentNumControlPoints?: number) {
@@ -296,7 +297,7 @@ function makeGUI() {
     .classed("selected", true);
 
   d3.select("#add-layers").on("click", () => {
-    if (state.numHiddenLayers >= 5) {
+    if (state.numHiddenLayers >= 3) {
       return;
     }
     state.networkShape[state.numHiddenLayers] = 1;
@@ -769,7 +770,7 @@ function drawNetwork(network: kan.KANNode[][]): void {
             // Position callout at the spline chart location
             calloutWeights.style({
               display: null,
-              top: `${splinePosition.y + SPLINE_CHART_SIZE/2 + 5}px`,
+              top: `${splinePosition.y + SPLINE_CHART_SIZE_Y/2 + 5}px`,
               left: `${splinePosition.x + 3}px`
             });
             targetIdWithCallout = edge.destNode.id;
@@ -796,14 +797,14 @@ function calculateGlobalSplinePositions(
 ): {[edgeKey: string]: {x: number, y: number}} {
   
   const VERTICAL_BUFFER = 5;
-  const CHART_WITH_BUFFER = SPLINE_CHART_SIZE + (2 * VERTICAL_BUFFER);
+  const CHART_WITH_BUFFER = SPLINE_CHART_SIZE_Y + (2 * VERTICAL_BUFFER);
   
   // Get SVG dimensions
   let svg = d3.select("#svg");
   let svgHeight = parseInt(svg.attr("height")) || 600; // fallback height
   let padding = 3;
-  let minY = padding + SPLINE_CHART_SIZE / 2 + VERTICAL_BUFFER;
-  let maxY = svgHeight - padding - SPLINE_CHART_SIZE / 2 - VERTICAL_BUFFER;
+  let minY = padding + SPLINE_CHART_SIZE_Y / 2 + VERTICAL_BUFFER;
+  let maxY = svgHeight - padding - SPLINE_CHART_SIZE_Y / 2 - VERTICAL_BUFFER;
 
   // Collect all edges for this layer and sort them by source node position, then destination node position
   let allEdges: {edge: kan.KANEdge, sourceY: number, destY: number, edgeKey: string}[] = [];
@@ -842,7 +843,7 @@ function calculateGlobalSplinePositions(
   if (allEdges.length > 1) {
     let totalHeight = (allEdges.length - 1) * CHART_WITH_BUFFER;
     if (totalHeight > availableHeight) {
-      spacing = Math.max(SPLINE_CHART_SIZE + 2, availableHeight / (allEdges.length - 1));
+      spacing = Math.max(SPLINE_CHART_SIZE_Y + 2, availableHeight / (allEdges.length - 1));
     }
   }
   
@@ -892,11 +893,11 @@ function drawLinkWithSplineChart(
   let splineY = splinePosition.y;
   
   // Constrain spline chart position to stay within SVG bounds
-  let minX = padding + SPLINE_CHART_SIZE / 2;
-  let maxX = svgWidth - padding - SPLINE_CHART_SIZE / 2;
-  let minY = padding + SPLINE_CHART_SIZE / 2;
-  let maxY = svgHeight - padding - SPLINE_CHART_SIZE / 2;
-  
+  let minX = padding + SPLINE_CHART_SIZE_X / 2;
+  let maxX = svgWidth - padding - SPLINE_CHART_SIZE_X / 2;
+  let minY = padding + SPLINE_CHART_SIZE_Y / 2;
+  let maxY = svgHeight - padding - SPLINE_CHART_SIZE_Y / 2;
+
   splineX = Math.max(minX, Math.min(maxX, splineX));
   splineY = Math.max(minY, Math.min(maxY, splineY));
   
@@ -906,18 +907,18 @@ function drawLinkWithSplineChart(
     .attr("id", `spline-${edgeId}`)
     .style({
       position: "absolute",
-      left: `${splineX - SPLINE_CHART_SIZE / 2 + 1}px`,
-      top: `${splineY - SPLINE_CHART_SIZE / 2}px`,
-      width: `${SPLINE_CHART_SIZE}px`,
-      height: `${SPLINE_CHART_SIZE}px`,
+      left: `${splineX - SPLINE_CHART_SIZE_X / 2 + 1}px`,
+      top: `${splineY - SPLINE_CHART_SIZE_Y / 2}px`,
+      width: `${SPLINE_CHART_SIZE_X}px`,
+      height: `${SPLINE_CHART_SIZE_Y}px`,
       "z-index": "10",
       "pointer-events": "auto"
     });
 
   // Create spline chart
   let splineChart = new SplineChart(splineDiv, {
-    width: SPLINE_CHART_SIZE,
-    height: SPLINE_CHART_SIZE,
+    width: SPLINE_CHART_SIZE_X,
+    height: SPLINE_CHART_SIZE_Y,
     title: "",
     showControlPoints: false,
     showOldControlPaths: false,
@@ -951,7 +952,7 @@ function drawLinkWithSplineChart(
       x: source.cy
     },
     target: {
-      y: splineX - SPLINE_CHART_SIZE / 2,
+      y: splineX - SPLINE_CHART_SIZE_X / 2,
       x: splineY
     }
   };
@@ -967,7 +968,7 @@ function drawLinkWithSplineChart(
   let line2 = container.insert("path", ":first-child");
   let datum2 = {
     source: {
-      y: splineX + SPLINE_CHART_SIZE / 2,
+      y: splineX + SPLINE_CHART_SIZE_X / 2,
       x: splineY
     },
     target: {
@@ -1342,7 +1343,7 @@ function updateHoverCard(type: HoverType, nodeOrEdge?: kan.KANNode | kan.KANEdge
   // For weight hover cards, position below the spline chart
   // Center the hover card horizontally relative to the spline chart
   finalX = coordinates[0] - 150; // Center 300px hover card around spline chart
-  finalY = coordinates[1] + (SPLINE_CHART_SIZE / 2) + 10; // Position below spline chart with 10px gap
+  finalY = coordinates[1] + (SPLINE_CHART_SIZE_Y / 2) + 10; // Position below spline chart with 10px gap
   
   // Ensure hover card stays within viewport bounds
   // Prevent going off left edge
@@ -1358,7 +1359,7 @@ function updateHoverCard(type: HoverType, nodeOrEdge?: kan.KANNode | kan.KANEdge
   // Prevent going off bottom edge (200px hover card height + padding)
   if (finalY + 210 > window.innerHeight) {
     // If no room below, position above the spline chart
-    finalY = coordinates[1] - (SPLINE_CHART_SIZE / 2) - 210;
+    finalY = coordinates[1] - (SPLINE_CHART_SIZE_Y / 2) - 210;
   }
   
   hovercard.style({
