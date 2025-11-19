@@ -21,10 +21,11 @@
   "devDependencies": {
     "@types/d3": "^3.5.34",
     "concat": "^1.0.3",
+    "concat-cli": "^4.0.0",
     "concurrently": "3.1.0",
-    "copyfiles": "1.0.0",
+    "copyfiles": "^1.2.0",
     "rimraf": "2.5.4",
-    "serve": "^11.3.0",
+    "serve": "^14.2.5",
     "tsify": "^4.0.0",
     "typescript": "^2.9",
     "uglify-js": "^2.8.29",
