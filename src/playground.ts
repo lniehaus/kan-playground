@@ -674,13 +674,12 @@ function drawNetwork(network: kan.KANNode[][]): void {
   let layerScale = d3.scale.ordinal<number, number>()
       .domain(d3.range(1, numLayers - 1))
       .rangePoints([featureWidth, width - RECT_SIZE], 0.7);
-  let splineIndexScale = (nodeIndex: number) => nodeIndex * (RECT_SIZE + 10);
   let nodeIndexScale = (nodeIndex: number) => nodeIndex * (RECT_SIZE + 25);
   
   // Calculate maxY before drawing anything
   let nodeIds = Object.keys(INPUTS);
   let maxLearnableFunctions = getMaxLearnableFunctions(network);
-  let maxY = splineIndexScale(maxLearnableFunctions);
+  let maxY = nodeIndexScale(maxLearnableFunctions);
 
   // Also consider the size of intermediate layers
   for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
