@@ -796,18 +796,16 @@ function calculateGlobalSplinePositions(
   node2coord: {[id: string]: {cx: number, cy: number}}
 ): {[edgeKey: string]: {x: number, y: number}} {
   
-  const VERTICAL_BUFFER = 5;
-  const CHART_WITH_BUFFER = SPLINE_CHART_SIZE_Y + (2 * VERTICAL_BUFFER);
+  // Use the same nodeIndexScale function that positions the heatmaps
+  let nodeIndexScale = (nodeIndex: number) => nodeIndex * (RECT_SIZE + 25);
   
   // Get SVG dimensions
   let svg = d3.select("#svg");
   let svgHeight = parseInt(svg.attr("height")) || 600; // fallback height
   let padding = 3;
-  let minY = padding + SPLINE_CHART_SIZE_Y / 2 + VERTICAL_BUFFER;
-  let maxY = svgHeight - padding - SPLINE_CHART_SIZE_Y / 2 - VERTICAL_BUFFER;
 
-  // Collect all edges for this layer and sort them by source node position, then destination node position
-  let allEdges: {edge: kan.KANEdge, sourceY: number, destY: number, edgeKey: string}[] = [];
+  // Collect all edges for this layer and sort them by destination node position, then source node position
+  let allEdges: {edge: kan.KANEdge, sourceY: number, destY: number, destNodeIdx: number, sourceNodeIdx: number, edgeKey: string}[] = [];
   
   let currentLayer = network[layerIdx];
   for (let nodeIdx = 0; nodeIdx < currentLayer.length; nodeIdx++) {
@@ -818,39 +816,49 @@ function calculateGlobalSplinePositions(
       let sourceCoord = node2coord[edge.sourceNode.id];
       let destCoord = node2coord[edge.destNode.id];
       
+      // Find source node index for proper alignment
+      let sourceNodeIdx = -1;
+      if (layerIdx === 1) {
+        // For first layer, find index in INPUTS
+        let inputIds = Object.keys(INPUTS);
+        for (let i = 0; i < inputIds.length; i++) {
+          if (inputIds[i] === edge.sourceNode.id) {
+            sourceNodeIdx = i;
+            break;
+          }
+        }
+      } else {
+        // For other layers, find index in previous layer
+        let prevLayer = network[layerIdx - 1];
+        for (let i = 0; i < prevLayer.length; i++) {
+          if (prevLayer[i].id === edge.sourceNode.id) {
+            sourceNodeIdx = i;
+            break;
+          }
+        }
+      }
+      
       allEdges.push({
         edge: edge,
         sourceY: sourceCoord.cy,
         destY: destCoord.cy,
+        destNodeIdx: nodeIdx,
+        sourceNodeIdx: sourceNodeIdx,
         edgeKey: edgeKey
       });
     }
   }
   
-  // Sort edges by destination node Y position first, then by source node Y position
-  // This groups edges going to the same destination node together
+  // Sort edges by destination node index first, then by source node index
+  // This groups edges going to the same destination node together and aligns with grid
   allEdges.sort((a, b) => {
-    if (a.destY !== b.destY) {
-      return a.destY - b.destY;
+    if (a.destNodeIdx !== b.destNodeIdx) {
+      return a.destNodeIdx - b.destNodeIdx;
     }
-    return a.sourceY - b.sourceY;
+    return a.sourceNodeIdx - b.sourceNodeIdx;
   });
   
-  // Calculate spacing (compress if necessary)
-  let availableHeight = maxY - minY;
-  let spacing = CHART_WITH_BUFFER;
-  
-  if (allEdges.length > 1) {
-    let totalHeight = (allEdges.length - 1) * CHART_WITH_BUFFER;
-    if (totalHeight > availableHeight) {
-      spacing = Math.max(SPLINE_CHART_SIZE_Y + 2, availableHeight / (allEdges.length - 1));
-    }
-  }
-  
-  // Start from the top (minY) instead of centering
-  let startY = minY;
-  
-  // Assign positions to each edge
+  // Assign positions to each edge using the same grid system as heatmaps
   let positions: {[edgeKey: string]: {x: number, y: number}} = {};
   
   allEdges.forEach((edgeInfo, index) => {
@@ -858,10 +866,15 @@ function calculateGlobalSplinePositions(
     let destCoord = node2coord[edgeInfo.edge.destNode.id];
     
     let splineX = (sourceCoord.cx + destCoord.cx) / 2;
-    let splineY = startY + index * spacing;
+    
+    // Align spline charts with the grid system used for heatmaps
+    // Position each spline chart at a grid position based on its index
+    let gridY = nodeIndexScale(index) + RECT_SIZE / 2;
     
     // Ensure the spline chart stays within bounds
-    splineY = Math.max(minY, Math.min(maxY, splineY));
+    let minY = padding + SPLINE_CHART_SIZE_Y / 2;
+    let maxY = svgHeight - padding - SPLINE_CHART_SIZE_Y / 2;
+    let splineY = Math.max(minY, Math.min(maxY, gridY));
     
     positions[edgeInfo.edgeKey] = {
       x: splineX,
