@@ -175,18 +175,7 @@ export class SplineChart {
     this.addAxes();
 
     // Add title
-    if (this.settings.title) {
-      // Position title above histogram if shown, otherwise just above plot
-      const titleY = this.settings.showActivationHistogram ? -70 : -10;
-      this.svg.append("text")
-        .attr("class", "spline-title")
-        .attr("x", this.width / 2)
-        .attr("y", titleY)
-        .attr("text-anchor", "middle")
-        .style("font-size", "14px")
-        .style("font-weight", "bold")
-        .text(this.settings.title);
-    }
+    this.renderTitle();
 
     // Add grid if enabled
     if (this.settings.showGrid) {
@@ -224,18 +213,7 @@ export class SplineChart {
     this.addAxes();
 
     // Add title
-    if (this.settings.title) {
-      // Position title above histogram if shown, otherwise just above plot
-      const titleY = this.settings.showActivationHistogram ? -70 : -10;
-      this.svg.append("text")
-        .attr("class", "spline-title")
-        .attr("x", this.width / 2)
-        .attr("y", titleY)
-        .attr("text-anchor", "middle")
-        .style("font-size", "14px")
-        .style("font-weight", "bold")
-        .text(this.settings.title);
-    }
+    this.renderTitle();
 
     // Add grid if enabled
     if (this.settings.showGrid) {
@@ -256,6 +234,54 @@ export class SplineChart {
         "border-radius": "0",
         "box-shadow": "none"
       });
+    }
+  }
+
+  /**
+   * Render title with support for subscripts (_) and superscripts (^)
+   * E.g., "X_1" renders as X with subscript 1
+   */
+  private renderTitle(): void {
+    if (!this.settings.title) return;
+    
+    const titleY = this.settings.showActivationHistogram ? -70 : -10;
+    const titleText = this.svg.append("text")
+      .attr("class", "spline-title")
+      .attr("x", this.width / 2)
+      .attr("y", titleY)
+      .attr("text-anchor", "middle")
+      .style("font-size", "14px")
+      .style("font-weight", "bold");
+    
+    const title = this.settings.title;
+    
+    // Check if title contains subscript or superscript markers
+    if (/[_^]/.test(title)) {
+      const regex = /(.*?)([_^])(.)/g;
+      let match;
+      let lastIndex = 0;
+      
+      while ((match = regex.exec(title)) != null) {
+        lastIndex = regex.lastIndex;
+        const prefix = match[1];
+        const separator = match[2];
+        const suffix = match[3];
+        
+        if (prefix) {
+          titleText.append("tspan").text(prefix);
+        }
+        
+        titleText.append("tspan")
+          .attr("baseline-shift", separator === "_" ? "sub" : "super")
+          .style("font-size", "9px")
+          .text(suffix);
+      }
+      
+      if (title.substring(lastIndex)) {
+        titleText.append("tspan").text(title.substring(lastIndex));
+      }
+    } else {
+      titleText.text(title);
     }
   }
 

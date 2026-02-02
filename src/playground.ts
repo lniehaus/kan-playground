@@ -1568,7 +1568,7 @@ function updateHoverCard(type: HoverType, nodeOrEdge?: kan.KANNode | kan.KANEdge
     const isDestOutput = edge.destNode.id === lastId;
     const isSourceInput = INPUTS.hasOwnProperty(edge.sourceNode.id);
 
-    let leftText = isSourceInput ? 'Input ' + edge.sourceNode.id : 'Node ' + edge.sourceNode.id;
+    let leftText = isSourceInput ? (INPUTS[edge.sourceNode.id].label || edge.sourceNode.id) : 'Node ' + edge.sourceNode.id;
     let rightText = isDestOutput ? 'Output' : 'Node ' + edge.destNode.id;
 
     let edgeText = `${leftText} → ${rightText}`;
