@@ -118,7 +118,7 @@ export class State {
   ];
 
   [key: string]: any;
-  learningRate = 0.03;
+  learningRate = 0.1;
   showTestData = false;
   noise = 0;
   batchSize = 10;
@@ -131,7 +131,7 @@ export class State {
   collectStats = false;
   numHiddenLayers = 1;
   hiddenLayerControls: any[] = [];
-  networkShape: number[] = [1];
+  networkShape: number[] = [2];
   numControlPoints = 5; // KAN number of control points for spline functions
   degree = 3;   // KAN B-spline degree (1=linear, 3=cubic, etc.)
   initNoise: number | "xavier" | "linear" = 0.3; // Allow strategies
