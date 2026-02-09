@@ -550,7 +550,7 @@ export class NetworkLayoutManager {
     network: kan.KANNode[][],
     numInputs: number,
     inputIds?: string[],
-    padding: number = 50
+    padding: number = 100
   ): number {
     // Calculate the maximum number of edges in any single layer
     let maxEdgesInLayer = 0;
