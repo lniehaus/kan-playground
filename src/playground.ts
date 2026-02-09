@@ -657,69 +657,151 @@ function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
       left: `${x + 3}px`,
       top: `${y + 3}px`,
       display: isOutput ? "none" : null
-    })
-    .on("mouseenter", function() {
-      selectedNodeId = nodeId;
-      div.classed("hovered", true);
-      nodeGroup.classed("hovered", true);
-      updateDecisionBoundary(network, false);
-      heatMap.updateBackground(boundary[nodeId], state.discretize);
-    })
-    .on("mouseleave", function() {
-      selectedNodeId = null;
-      div.classed("hovered", false);
-      nodeGroup.classed("hovered", false);
-      updateDecisionBoundary(network, false);
-      heatMap.updateBackground(boundary[kan.getKANOutputNode(network).id],
-          state.discretize);
     });
+
+  const handleNodeHoverEnter = () => {
+    selectedNodeId = nodeId;
+    div.classed("hovered", true);
+    nodeGroup.classed("hovered", true);
+    updateDecisionBoundary(network, false);
+    heatMap.updateBackground(boundary[nodeId], state.discretize);
+  };
+
+  const handleNodeHoverLeave = () => {
+    selectedNodeId = null;
+    div.classed("hovered", false);
+    nodeGroup.classed("hovered", false);
+    updateDecisionBoundary(network, false);
+    heatMap.updateBackground(boundary[kan.getKANOutputNode(network).id],
+        state.discretize);
+  };
+
+  div.on("mouseenter", function() {
+    handleNodeHoverEnter();
+  })
+  .on("mouseleave", function() {
+    handleNodeHoverLeave();
+  });
   
   // Add click handlers
-  if (isInput) {
-    div.on("click", function() {
-      state[nodeId] = !state[nodeId];
-      parametersChanged = true;
-      reset();
+  const toggleInputActive = () => {
+    state[nodeId] = !state[nodeId];
+    parametersChanged = true;
+    reset();
+  };
+
+  const toggleHiddenActive = () => {
+    node.isActive = !node.isActive;
+    div.classed("inactive", !node.isActive);
+    nodeGroup.classed("inactive", !node.isActive);
+    
+    // Reset histograms for ALL edges in the network
+    for (let layerIdx = 1; layerIdx < network.length; layerIdx++) {
+      let currentLayer = network[layerIdx];
+      for (let i = 0; i < currentLayer.length; i++) {
+        let n = currentLayer[i];
+        for (let j = 0; j < n.inputEdges.length; j++) {
+          n.inputEdges[j].resetHistogram();
+        }
+      }
+    }
+    
+    // Repopulate histograms with current network state
+    trainData.forEach((point) => {
+      let input = constructInput(point.x, point.y);
+      kan.kanForwardProp(network, input, true);
     });
+    
+    // Update visualizations (forced because this is a user interaction)
+    updateWeightsUI(network, d3.select("g.core"), true);
+    updateDecisionBoundary(network, false);
+    
+    let selectedId = selectedNodeId != null ?
+        selectedNodeId : kan.getKANOutputNode(network).id;
+    heatMap.updateBackground(boundary[selectedId], state.discretize);
+    
+    d3.select("#network").selectAll("div.canvas")
+        .each(function(data: {heatmap: HeatMap, id: string}) {
+      data.heatmap.updateBackground(reduceMatrix(boundary[data.id], 10),
+          state.discretize);
+    });
+  };
+
+  const addLongPressHandlers = (onLongPress: () => void) => {
+    let longPressTimer: number | null = null;
+    let longPressTriggered = false;
+
+    const clearLongPressTimer = () => {
+      if (longPressTimer !== null) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    };
+
+    const startLongPressTimer = () => {
+      longPressTriggered = false;
+      clearLongPressTimer();
+      longPressTimer = window.setTimeout(() => {
+        longPressTriggered = true;
+        onLongPress();
+      }, LONG_PRESS_MS);
+    };
+
+    div.on("pointerdown", function() {
+      const event = d3.event as PointerEvent;
+      if (event && event.pointerType && event.pointerType !== "touch") {
+        return;
+      }
+      startLongPressTimer();
+    });
+
+    div.on("touchstart", function() {
+      startLongPressTimer();
+    });
+
+    div.on("pointerup", function() {
+      clearLongPressTimer();
+    });
+
+    div.on("touchend", function() {
+      clearLongPressTimer();
+    });
+
+    div.on("pointercancel", function() {
+      clearLongPressTimer();
+    });
+
+    div.on("touchcancel", function() {
+      clearLongPressTimer();
+    });
+
+    div.on("click", function() {
+      if (longPressTriggered) {
+        longPressTriggered = false;
+        return;
+      }
+      handleNodeHoverEnter();
+    });
+  };
+
+  if (isInput) {
+    if (IS_TOUCHSCREEN) {
+      addLongPressHandlers(toggleInputActive);
+    } else {
+      div.on("click", function() {
+        toggleInputActive();
+      });
+    }
     div.style("cursor", "pointer");
   } else if (!isOutput && node) {
     // Hidden layer nodes can be activated/deactivated
-    div.on("click", function() {
-      node.isActive = !node.isActive;
-      div.classed("inactive", !node.isActive);
-      nodeGroup.classed("inactive", !node.isActive);
-      
-      // Reset histograms for ALL edges in the network
-      for (let layerIdx = 1; layerIdx < network.length; layerIdx++) {
-        let currentLayer = network[layerIdx];
-        for (let i = 0; i < currentLayer.length; i++) {
-          let n = currentLayer[i];
-          for (let j = 0; j < n.inputEdges.length; j++) {
-            n.inputEdges[j].resetHistogram();
-          }
-        }
-      }
-      
-      // Repopulate histograms with current network state
-      trainData.forEach((point) => {
-        let input = constructInput(point.x, point.y);
-        kan.kanForwardProp(network, input, true);
+    if (IS_TOUCHSCREEN) {
+      addLongPressHandlers(toggleHiddenActive);
+    } else {
+      div.on("click", function() {
+        toggleHiddenActive();
       });
-      
-      // Update visualizations (forced because this is a user interaction)
-      updateWeightsUI(network, d3.select("g.core"), true);
-      updateDecisionBoundary(network, false);
-      
-      let selectedId = selectedNodeId != null ?
-          selectedNodeId : kan.getKANOutputNode(network).id;
-      heatMap.updateBackground(boundary[selectedId], state.discretize);
-      
-      d3.select("#network").selectAll("div.canvas")
-          .each(function(data: {heatmap: HeatMap, id: string}) {
-        data.heatmap.updateBackground(reduceMatrix(boundary[data.id], 10),
-            state.discretize);
-      });
-    });
+    }
     div.style("cursor", "pointer");
   }
   
@@ -1802,9 +1884,31 @@ function getRelativeHeight(selection: d3.Selection<any>) {
   return node.offsetHeight + node.offsetTop;
 }
 
+function updateCalloutTextForDevice(): void {
+  const thumbnailLabel = d3.select(".callout.thumbnail .label");
+  const weightsLabel = d3.select(".callout.weights .label");
+
+  if (IS_TOUCHSCREEN) {
+    thumbnailLabel.html(
+      "This is the summation of multiple <b>univariate B-spline activation functions</b>. Tap to see it larger."
+    );
+    weightsLabel.html(
+      "This is a learnable <b>univariate B-spline activation function</b>. Tap to open; long-press to activate/deactivate."
+    );
+  } else {
+    thumbnailLabel.html(
+      "This is the summation of multiple <b>univariate B-spline activation functions</b>. Hover to see it larger."
+    );
+    weightsLabel.html(
+      "This is a learnable <b>univariate B-spline activation function</b>. Hover to open; click to activate/deactivate."
+    );
+  }
+}
+
 drawDatasetThumbnails();
 initTutorial();
 makeGUI();
+updateCalloutTextForDevice();
 
 // Set up hovercard event handlers to keep it visible when mouse is over it
 // and hide it when mouse leaves it
