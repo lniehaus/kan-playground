@@ -55,6 +55,19 @@ const SPLINE_CHART_SIZE_X = 40;
 const SPLINE_CHART_SIZE_Y = 30;
 const NODE_SPACING = 25;
 const HEATMAP_UPDATE_THROTTLE_MS = 32; // Throttle heatmap updates during drag
+const LONG_PRESS_MS = 450;
+const IS_TOUCHSCREEN = (() => {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const hasCoarsePointer =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(pointer: coarse)").matches;
+  const hasTouchPoints =
+    typeof navigator !== "undefined" &&
+    (navigator.maxTouchPoints != null && navigator.maxTouchPoints > 0);
+  return hasCoarsePointer || hasTouchPoints || "ontouchstart" in window;
+})();
 
 // Helper: populate numControlPoints options based on degree
 function updateNumControlPointsOptionsForDegree(degreeVal: number, currentNumControlPoints?: number) {
@@ -968,8 +981,7 @@ function drawLinkWithSplineChart(
   // Apply initial active/inactive styling
   splineDiv.classed("inactive", !edge.isActive);
 
-  // Add click handler to toggle active state
-  splineDiv.on("click", function() {
+  const toggleEdgeActive = () => {
     edge.isActive = !edge.isActive;
     splineDiv.classed("inactive", !edge.isActive);
     
@@ -1011,47 +1023,109 @@ function drawLinkWithSplineChart(
       const outputHistogramData = edge.getNormalizedOutputHistogram();
       hoverCardSplineChart.updateFunction(edge.learnableFunction, inputHistogramData, outputHistogramData, edge.outputHistogramRange);
     }
-    
-    // Prevent event from bubbling to hover handlers
-    const clickEvent = d3.event as Event;
-    if (clickEvent.stopPropagation) {
-      clickEvent.stopPropagation();
-    }
-  });
+  };
 
-  // Add hover functionality to spline chart div (single source of hover state)
-  splineDiv.on("mouseenter", function() {
-    // Visual feedback on hover using CSS class (prevents event queue blocking)
-    d3.select(this)
-      .classed("spline-hovered", true)
-      .style("z-index", "15"); // Elevate z-index on hover
-    
-    updateHoverCard(HoverType.WEIGHT, edge, [splineX, splineY]);
-  }).on("mouseleave", function() {
-    // Reset visual feedback using CSS class
-    d3.select(this)
-      .classed("spline-hovered", false)
-      .style("z-index", "10"); // Reset z-index
-    
-    // Don't hide if user is dragging a control point
-    if (isDraggingControlPoint) {
-      return;
-    }
-    // Longer delay to allow smooth mouse movement to hovercard
-    hoverCardHideTimeout = setTimeout(() => {
-      updateHoverCard(null);
-    }, 100);
-  }).on("mousemove", function() {
-    // Track cursor position
-    const event = d3.event as MouseEvent;
-    lastMousePosition = {x: event.pageX, y: event.pageY};
-    
-    // Cancel hide timeout if mouse is still moving over the spline chart
-    if (hoverCardHideTimeout !== null) {
-      clearTimeout(hoverCardHideTimeout);
-      hoverCardHideTimeout = null;
-    }
-  });
+  if (IS_TOUCHSCREEN) {
+    let longPressTimer: number | null = null;
+    let longPressTriggered = false;
+
+    const clearLongPressTimer = () => {
+      if (longPressTimer !== null) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    };
+
+    const startLongPressTimer = () => {
+      longPressTriggered = false;
+      clearLongPressTimer();
+      longPressTimer = window.setTimeout(() => {
+        longPressTriggered = true;
+        toggleEdgeActive();
+      }, LONG_PRESS_MS);
+    };
+
+    splineDiv.on("pointerdown", function() {
+      const event = d3.event as PointerEvent;
+      if (event && event.pointerType && event.pointerType !== "touch") {
+        return;
+      }
+      startLongPressTimer();
+    });
+
+    splineDiv.on("touchstart", function() {
+      startLongPressTimer();
+    });
+
+    splineDiv.on("pointerup", function() {
+      clearLongPressTimer();
+    });
+
+    splineDiv.on("touchend", function() {
+      clearLongPressTimer();
+    });
+
+    splineDiv.on("pointercancel", function() {
+      clearLongPressTimer();
+    });
+
+    splineDiv.on("touchcancel", function() {
+      clearLongPressTimer();
+    });
+
+    splineDiv.on("click", function() {
+      if (longPressTriggered) {
+        longPressTriggered = false;
+        return;
+      }
+      updateHoverCard(HoverType.WEIGHT, edge, [splineX, splineY]);
+    });
+  } else {
+    // Desktop: click toggles active state
+    splineDiv.on("click", function() {
+      toggleEdgeActive();
+      
+      // Prevent event from bubbling to hover handlers
+      const clickEvent = d3.event as Event;
+      if (clickEvent.stopPropagation) {
+        clickEvent.stopPropagation();
+      }
+    });
+
+    // Add hover functionality to spline chart div (single source of hover state)
+    splineDiv.on("mouseenter", function() {
+      // Visual feedback on hover using CSS class (prevents event queue blocking)
+      d3.select(this)
+        .classed("spline-hovered", true)
+        .style("z-index", "15"); // Elevate z-index on hover
+      
+      updateHoverCard(HoverType.WEIGHT, edge, [splineX, splineY]);
+    }).on("mouseleave", function() {
+      // Reset visual feedback using CSS class
+      d3.select(this)
+        .classed("spline-hovered", false)
+        .style("z-index", "10"); // Reset z-index
+      
+      // Don't hide if user is dragging a control point
+      if (isDraggingControlPoint) {
+        return;
+      }
+      // Longer delay to allow smooth mouse movement to hovercard
+      hoverCardHideTimeout = setTimeout(() => {
+        updateHoverCard(null);
+      }, 100);
+    }).on("mousemove", function() {
+      // Track cursor position
+      const event = d3.event as MouseEvent;
+      lastMousePosition = {x: event.pageX, y: event.pageY};
+      
+      // Cancel hide timeout if mouse is still moving over the spline chart
+      if (hoverCardHideTimeout !== null) {
+        clearTimeout(hoverCardHideTimeout);
+        hoverCardHideTimeout = null;
+      }
+    });
+  }
 
   // Draw first link: source node to spline chart
   let line1 = container.insert("path", ":first-child");

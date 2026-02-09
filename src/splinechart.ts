@@ -155,10 +155,16 @@ export class SplineChart {
     this.updateBorder();
 
     // Create SVG
-    this.svg = this.chartContainer
+    const svgEl = this.chartContainer
       .append("svg")
       .attr("width", this.settings.width)
-      .attr("height", this.settings.height)
+      .attr("height", this.settings.height);
+
+    if (this.settings.interactive) {
+      svgEl.style("touch-action", "none");
+    }
+
+    this.svg = svgEl
       .append("g")
       .attr("transform", `translate(${this.margin.left},${this.margin.top})`);
 
@@ -193,10 +199,16 @@ export class SplineChart {
     this.height = this.settings.height! - this.margin.top - this.margin.bottom;
 
     // Recreate SVG with new transform
-    this.svg = this.chartContainer
+    const svgEl = this.chartContainer
       .append("svg")
       .attr("width", this.settings.width)
-      .attr("height", this.settings.height)
+      .attr("height", this.settings.height);
+
+    if (this.settings.interactive) {
+      svgEl.style("touch-action", "none");
+    }
+
+    this.svg = svgEl
       .append("g")
       .attr("transform", `translate(${this.margin.left},${this.margin.top})`);
 
@@ -632,12 +644,22 @@ export class SplineChart {
         .on("dragstart", () => {
           // Set dragging flag for smooth Y-axis transitions
           this.isDragging = true;
+          const dragStartEvent: any = d3.event;
+          if (dragStartEvent && dragStartEvent.sourceEvent &&
+              dragStartEvent.sourceEvent.preventDefault) {
+            dragStartEvent.sourceEvent.preventDefault();
+          }
           // Notify that dragging has started
           if (this.onDragStart) {
             this.onDragStart();
           }
         })
         .on("drag", (d: any) => {
+          const dragEvent: any = d3.event;
+          if (dragEvent && dragEvent.sourceEvent &&
+              dragEvent.sourceEvent.preventDefault) {
+            dragEvent.sourceEvent.preventDefault();
+          }
           // Update y position based on drag
           const event: any = d3.event;
           let newY = this.yScale.invert(event.y);
@@ -775,11 +797,21 @@ export class SplineChart {
         })
         .on("dragstart", () => {
           this.isDragging = true;
+          const dragStartEvent: any = d3.event;
+          if (dragStartEvent && dragStartEvent.sourceEvent &&
+              dragStartEvent.sourceEvent.preventDefault) {
+            dragStartEvent.sourceEvent.preventDefault();
+          }
           if (this.onDragStart) {
             this.onDragStart();
           }
         })
         .on("drag", (d: any) => {
+          const dragEvent: any = d3.event;
+          if (dragEvent && dragEvent.sourceEvent &&
+              dragEvent.sourceEvent.preventDefault) {
+            dragEvent.sourceEvent.preventDefault();
+          }
           const event: any = d3.event;
           let newY = this.yScale.invert(event.y);
           // Clamp the value between -10 and 10
