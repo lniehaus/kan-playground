@@ -58,14 +58,14 @@ limitations under the License.
   <div id="top-controls">
     <div class="container l--page">
       <div class="timeline-controls">
-        <button class="mdl-button mdl-js-button mdl-button--icon ui-resetButton" id="reset-button" title="Reset the network">
+        <button class="mdl-button mdl-js-button mdl-button--icon ui-resetButton" id="reset-button" data-tooltip="Reset the network">
           <i class="material-icons">replay</i>
         </button>
-        <button class="mdl-button mdl-js-button mdl-button--fab mdl-button--colored ui-playButton" id="play-pause-button" title="Run/Pause">
+        <button class="mdl-button mdl-js-button mdl-button--fab mdl-button--colored ui-playButton" id="play-pause-button" data-tooltip="Run/Pause">
           <i class="material-icons">play_arrow</i>
           <i class="material-icons">pause</i>
         </button>
-        <button class="mdl-button mdl-js-button mdl-button--icon ui-stepButton" id="next-step-button" title="Step">
+        <button class="mdl-button mdl-js-button mdl-button--icon ui-stepButton" id="next-step-button" data-tooltip="Step">
           <i class="material-icons">skip_next</i>
         </button>
       </div>
@@ -73,7 +73,7 @@ limitations under the License.
         <span class="label">Epoch</span>
         <span class="value" id="iter-number"></span>
       </div>
-      <div class="control ui-learningRate">
+      <div class="control ui-learningRate" data-tooltip="Step size for gradient updates.">
         <label for="learningRate">Learning rate</label>
         <div class="select">
           <select id="learningRate">
@@ -89,7 +89,7 @@ limitations under the License.
           </select>
         </div>
       </div>
-      <div class="control ui-degree">
+      <div class="control ui-degree" data-tooltip="Polynomial degree of the B-spline activation function.">
         <label for="degree">Spline degree</label>
         <div class="select">
           <select id="degree">
@@ -101,15 +101,15 @@ limitations under the License.
           </select>
         </div>
       </div>
-      <div class="control ui-numControlPoints">
-        <label for="numControlPoints">Control Points</label>
+      <div class="control ui-numControlPoints" data-tooltip="Number of control points for each B-spline (depends on degree).">
+        <label for="numControlPoints">Control points</label>
         <div class="select">
           <select id="numControlPoints">
             <!-- Options set dynamically in playground.ts based on degree -->
           </select>
         </div>
       </div>
-      <div class="control ui-initNoise">
+      <div class="control ui-initNoise" data-tooltip="Coefficient initialization variance.">
         <label for="initNoise">Initialization</label>
         <div class="select">
           <select id="initNoise">
@@ -123,7 +123,7 @@ limitations under the License.
           </select>
         </div>
       </div>
-      <div class="control ui-problem">
+      <div class="control ui-problem" data-tooltip="Choose classification or regression task.">
         <label for="problem">Problem type</label>
         <div class="select">
           <select id="problem">

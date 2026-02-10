@@ -265,6 +265,11 @@ header h1 .optional {
   align-items: center;
   margin-right: 20px;
   width: 140px;
+  overflow: visible;
+}
+
+#top-controls .timeline-controls .mdl-button {
+  overflow: visible;
 }
 
 #play-pause-button .material-icons {
@@ -292,6 +297,55 @@ header h1 .optional {
   min-width: 110px;
   margin-left: 30px;
   margin-top: 6px;
+}
+
+#top-controls [data-tooltip] {
+  position: relative;
+  overflow: visible;
+}
+
+#top-controls [data-tooltip]::after,
+#top-controls [data-tooltip]::before {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -6px);
+  z-index: 1100;
+}
+
+#top-controls [data-tooltip]::after {
+  content: attr(data-tooltip);
+  top: -20px;
+  white-space: nowrap;
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 400;
+  text-transform: none;
+  line-height: 1.2;
+  padding: 6px 8px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+#top-controls [data-tooltip]::before {
+  content: "";
+  top: 6px;
+  border-width: 6px 6px 0 6px;
+  border-style: solid;
+  border-color: rgba(0, 0, 0, 0.85) transparent transparent transparent;
+}
+
+#top-controls [data-tooltip]:hover::after,
+#top-controls [data-tooltip]:hover::before {
+  opacity: 1;
+  transform: translate(-50%, -10px);
+}
+
+#top-controls [data-tooltip]:hover {
+  z-index: 1101;
 }
 
 #top-controls .control .label,
