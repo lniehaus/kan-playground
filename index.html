@@ -121,9 +121,8 @@ limitations under the License.
         <label for="initNoise">Initialization</label>
         <div class="select">
           <select id="initNoise">
-            <option value="xavier">Glorot-like</option>
             <option value="lecun">LeCun</option>
-            <option value="glorot-rigas">Glorot (Rigas)</option>
+            <option value="glorot">Glorot</option>
             <option value="linear">Linear</option>
             <option value="0.1">0.1 (Very small)</option>
             <option value="0.3">0.3 (Default)</option>
@@ -388,13 +387,13 @@ limitations under the License.
       <p><b>Control Points:</b> Sets how many control points each B-spline function on an edge uses. More control points
         let the spline capture finer detail but increase compute and memory usage; fewer control points enforce
         smoother, simpler functions, which can regularize but may underfit complex patterns.</p>
-      <p><b>Initialization:</b> Determines how spline control points are initialized at network creation. "Glorot-like"
-        uses basis-agnostic Xavier/Glorot initialization that accounts for B-spline properties and preserves variance in
-        forward and backward passes—recommended for most use cases. "Linear" creates identity or negative identity
-        functions, starting the network close to linear transformations. Numeric values (0.1-2.0) initialize control
-        points with random noise of varying magnitudes: smaller values (0.1-0.3) provide gentle perturbations, while
-        larger values (1.0-2.0) create more varied initial functions that can help break symmetry but may reduce
-        training stability.</p>
+      <p><b>Initialization:</b> Determines how spline control points are initialized at network creation. "LeCun" and
+        "Glorot" use basis-aware initialization schemes that account for B-spline properties and help preserve
+        variance during forward and backward passes. "Linear" creates identity or negative identity functions, starting
+        the network close to linear transformations. Numeric values (0.1-2.0) initialize control points with random
+        noise of varying magnitudes: smaller values (0.1-0.3) provide gentle perturbations, while larger values
+        (1.0-2.0) create more varied initial functions that can help break symmetry but may reduce training
+        stability.</p>
       <p><b>Problem Type:</b> Determines the network's output configuration and loss function. Classification problems
         use categorical outputs with cross-entropy loss for predicting discrete classes (e.g., orange vs. blue points).
         Regression problems use continuous outputs with mean squared error loss for predicting continuous values (e.g.,

@@ -35,14 +35,12 @@ export class Errors {
  * This is the core component of a KAN (Kolmogorov-Arnold Network).
  * 
  * Initialization:
- * - When using "xavier" initialization, this class implements a basis-agnostic
- *   Glorot-like initialization scheme that accounts for B-spline basis function properties.
+ * - When using "glorot" initialization, this class implements a basis-agnostic initialization scheme that accounts for B-spline basis function properties.
  * - Each control point is initialized from N(0, σ_m²) where σ_m depends on:
  *   1. The expected squared value of the basis function: E[B_m(x)²]
  *   2. The expected squared value of its derivative: E[B'_m(x)²]
  *   3. The layer dimensions (fanIn, fanOut)
  * - This ensures proper variance preservation in both forward and backward passes.
- * - See KAN_INITIALIZATION.md for details.
  */
 export class LearnableFunction {
   id: string;
@@ -50,7 +48,7 @@ export class LearnableFunction {
   knotVector: number[] = [];
   gridSize: number;
   degree: number;
-  initNoise: number | "xavier" | "linear" | "lecun" | "glorot-rigas";
+  initNoise: number | "lecun" | "glorot" | "linear";
   inputRange: [number, number] = [-6, 6];
   private fanIn: number;
   private fanOut: number;
@@ -60,7 +58,7 @@ export class LearnableFunction {
     gridSize: number = 5,
     range: [number, number] = [-6, 6],
     degree: number = 3,
-    initNoise: number | "xavier" | "linear" | "lecun" | "glorot-rigas" = 0.3,
+    initNoise: number | "lecun" | "glorot" | "linear" = 0.3,
     fanIn: number = 1,
     fanOut: number = 1
   ) {
@@ -126,41 +124,6 @@ export class LearnableFunction {
       return;
     }
 
-    if (this.initNoise === "xavier") {
-      // Basis-agnostic Glorot-like initialization for KANs
-      // Based on the paper's proposed scheme: σ_m = gain * sqrt(1/D * 2/(d_I * μ_m^(0) + d_O * μ_m^(1)))
-      // where μ_m^(0) = E[B_m(x)^2] and μ_m^(1) = E[B'_m(x)^2]
-
-      const safeFanIn = Math.max(1, this.fanIn | 0);
-      const safeFanOut = Math.max(1, this.fanOut | 0);
-
-      // Xavier/Glorot uses gain = 1.0
-      const gain = 1.0;
-
-      // Compute μ_m^(0) and μ_m^(1) for each basis function
-      const mu0 = this.computeBasisFunctionExpectations();
-      const mu1 = this.computeBasisDerivativeExpectations();
-
-      // Number of basis functions (D in the paper)
-      const D = numControlPoints;
-
-      // Initialize each control point with basis-specific variance
-      for (let m = 0; m < numControlPoints; m++) {
-        // Formula from the paper: σ_m = gain * sqrt(1/D * 2/(d_I * μ_m^(0) + d_O * μ_m^(1)))
-        const denominator = safeFanIn * mu0[m] + safeFanOut * mu1[m];
-        const sigma_m = denominator > 0 ?
-          gain * Math.sqrt((1.0 / D) * (2.0 / denominator)) :
-          gain * Math.sqrt(2.0 / (safeFanIn + safeFanOut)); // Fallback to standard Glorot
-
-        // Sample from N(0, σ_m^2) using Box-Muller transform
-        const u1 = Math.random();
-        const u2 = Math.random();
-        const z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
-        this.controlPoints.push(z * sigma_m);
-      }
-      return;
-    }
-
     if (this.initNoise === "lecun") {
       // LeCun-inspired initialization for KANs (Rigas et al., 2025)
       // Preserves forward-pass variance: σ = sqrt(Var(x) / (n_in · D · μ_B^(0)))
@@ -187,7 +150,7 @@ export class LearnableFunction {
       return;
     }
 
-    if (this.initNoise === "glorot-rigas") {
+    if (this.initNoise === "glorot") {
       // Glorot-inspired initialization for KANs (Rigas et al., 2025)
       // Balances forward- and backward-pass variance:
       // σ = sqrt(1/D · 2 / (n_in · μ_B^(0) + n_out · μ_B^(1)))
@@ -316,119 +279,7 @@ export class LearnableFunction {
     return { mu0Avg, mu1Avg };
   }
 
-  /**
-   * Compute E[B_m(x)^2] for each basis function m
-   * Assumes input x ~ N(0, 1) as per the paper's assumptions
-   */
-  private computeBasisFunctionExpectations(): number[] {
-    const numControlPoints = this.gridSize + 1;
-    const expectations: number[] = [];
 
-    // Monte Carlo estimation: sample from N(0, 1)
-    const numSamples = 10000;
-    const samples: number[] = [];
-
-    // Generate samples from N(0, 1) using Box-Muller transform
-    for (let i = 0; i < numSamples; i++) {
-      const u1 = Math.random();
-      const u2 = Math.random();
-      const z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
-      // Clamp to input range to avoid out-of-bounds issues
-      samples.push(Math.max(this.inputRange[0], Math.min(this.inputRange[1], z)));
-    }
-
-    // For each basis function (control point)
-    for (let m = 0; m < numControlPoints; m++) {
-      let sum = 0;
-      for (const x of samples) {
-        const span = this.findKnotSpan(x);
-        const basisValues = this.computeBasisFunctions(span, x);
-        const p = this.degree;
-
-        // Find which basis function corresponds to control point m
-        let basisValue = 0;
-        for (let j = 0; j <= p; j++) {
-          const controlPointIndex = span - p + j;
-          if (controlPointIndex === m) {
-            basisValue = basisValues[j];
-            break;
-          }
-        }
-
-        sum += basisValue * basisValue;
-      }
-      expectations.push(sum / numSamples);
-    }
-
-    return expectations;
-  }
-
-  /**
-   * Compute E[B'_m(x)^2] for each basis function derivative
-   * Assumes input x ~ N(0, 1) as per the paper's assumptions
-   */
-  private computeBasisDerivativeExpectations(): number[] {
-    const numControlPoints = this.gridSize + 1;
-    const expectations: number[] = [];
-
-    // Monte Carlo estimation: sample from N(0, 1)
-    const numSamples = 10000;
-    const samples: number[] = [];
-
-    // Generate samples from N(0, 1) using Box-Muller transform
-    for (let i = 0; i < numSamples; i++) {
-      const u1 = Math.random();
-      const u2 = Math.random();
-      const z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
-      // Clamp to input range to avoid out-of-bounds issues
-      samples.push(Math.max(this.inputRange[0], Math.min(this.inputRange[1], z)));
-    }
-
-    // For each basis function (control point)
-    for (let m = 0; m < numControlPoints; m++) {
-      let sum = 0;
-      for (const x of samples) {
-        // Compute derivative of basis function using finite differences
-        const h = 1e-6;
-        const x1 = Math.max(this.inputRange[0], x - h);
-        const x2 = Math.min(this.inputRange[1], x + h);
-
-        // Get basis function values at x1 and x2
-        const span1 = this.findKnotSpan(x1);
-        const basis1 = this.computeBasisFunctions(span1, x1);
-        const span2 = this.findKnotSpan(x2);
-        const basis2 = this.computeBasisFunctions(span2, x2);
-
-        const p = this.degree;
-
-        // Find basis function value for control point m at x1 and x2
-        let basisValue1 = 0;
-        for (let j = 0; j <= p; j++) {
-          const controlPointIndex = span1 - p + j;
-          if (controlPointIndex === m) {
-            basisValue1 = basis1[j];
-            break;
-          }
-        }
-
-        let basisValue2 = 0;
-        for (let j = 0; j <= p; j++) {
-          const controlPointIndex = span2 - p + j;
-          if (controlPointIndex === m) {
-            basisValue2 = basis2[j];
-            break;
-          }
-        }
-
-        // Compute derivative
-        const derivative = (x2 - x1) > 1e-10 ? (basisValue2 - basisValue1) / (x2 - x1) : 0;
-        sum += derivative * derivative;
-      }
-      expectations.push(sum / numSamples);
-    }
-
-    return expectations;
-  }
 
   /** Evaluate the B-spline at input x using de Boor's algorithm */
   evaluate(x: number): number {
@@ -602,7 +453,7 @@ export class KANEdge {
     dest: KANNode,
     gridSize: number = 5,
     degree: number = 3,
-    initNoise: number | "xavier" | "linear" | "lecun" | "glorot-rigas" = 0.3,
+    initNoise: number | "linear" | "lecun" | "glorot" = 0.3,
     fanIn: number = 1,
     fanOut: number = 1
   ) {
@@ -895,7 +746,7 @@ export function buildKANNetwork(
   inputIds: string[],
   gridSize: number = 5,
   degree: number = 3,
-  initNoise: number | "xavier" | "linear" | "lecun" | "glorot-rigas" = 0.3
+  initNoise: number | "linear" | "lecun" | "glorot" = 0.3
 ): KANNode[][] {
   const numLayers = networkShape.length;
   let nodeId = 1;

@@ -4,16 +4,6 @@ An interactive visualization of Kolmogorov-Arnold Networks (KANs), based on Deep
 written in TypeScript using d3.js. We use GitHub issues for tracking new requests and bugs.
 Your feedback is highly appreciated!
 
-## ✨ New: Basis-Agnostic Glorot-like Initialization
-
-This playground now implements a theoretically-grounded initialization scheme for KANs that:
-- Accounts for B-spline basis function properties
-- Preserves variance in both forward and backward passes
-- Generalizes Xavier/Glorot, Kaiming/He, and LeCun initialization to KANs
-- Uses proper Gaussian sampling for better training dynamics
-
-📚 See [QUICKSTART.md](QUICKSTART.md) for immediate usage or [KAN_INITIALIZATION.md](KAN_INITIALIZATION.md) for details.
-
 **If you'd like to contribute, be sure to review the [contribution guidelines](CONTRIBUTING.md).**
 
 ## Development
