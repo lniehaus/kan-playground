@@ -54,6 +54,8 @@ const DENSITY = 100;
 const SPLINE_CHART_SIZE_X = 40;
 const SPLINE_CHART_SIZE_Y = 30;
 const NODE_SPACING = 25;
+const HOVERCARD_CHART_WIDTH = 300;
+const HOVERCARD_CHART_HEIGHT = 300;
 const HEATMAP_UPDATE_THROTTLE_MS = 32; // Throttle heatmap updates during drag
 const LONG_PRESS_MS = 450;
 const IS_TOUCHSCREEN = (() => {
@@ -1671,7 +1673,11 @@ function updateHoverCard(type: HoverType, nodeOrEdge?: kan.KANNode | kan.KANEdge
   
   // For weight hover cards, position below the spline chart
   // Center the hover card horizontally relative to the spline chart
-  finalX = coordinates[0] - 150; // Center 300px hover card around spline chart
+  const hoverCardPadding = 10; // CSS padding on hovercard
+  const hoverCardTotalWidth = HOVERCARD_CHART_WIDTH + (hoverCardPadding * 2);
+  const hoverCardTotalHeight = HOVERCARD_CHART_HEIGHT + (hoverCardPadding * 2);
+  
+  finalX = coordinates[0] - (hoverCardTotalWidth / 2); // Center hover card around spline chart
   finalY = coordinates[1] + (SPLINE_CHART_SIZE_Y / 2) + 15; // Position below spline chart with 15px gap
   
   // Ensure hover card stays within viewport bounds (accounting for scroll)
@@ -1683,15 +1689,15 @@ function updateHoverCard(type: HoverType, nodeOrEdge?: kan.KANNode | kan.KANEdge
     finalX = scrollX + 10;
   }
   
-  // Prevent going off right edge (300px hover card width + padding)
-  if (finalX - scrollX + 310 > viewportWidth) {
-    finalX = scrollX + viewportWidth - 310;
+  // Prevent going off right edge
+  if (finalX - scrollX + hoverCardTotalWidth + 10 > viewportWidth) {
+    finalX = scrollX + viewportWidth - hoverCardTotalWidth - 10;
   }
   
-  // Prevent going off bottom edge (estimated 350px hover card height + padding)
-  if (finalY - scrollY + 350 > viewportHeight) {
+  // Prevent going off bottom edge
+  if (finalY - scrollY + hoverCardTotalHeight + 10 > viewportHeight) {
     // If no room below, position above the spline chart
-    finalY = coordinates[1] - (SPLINE_CHART_SIZE_Y / 2) - 360;
+    finalY = coordinates[1] - (SPLINE_CHART_SIZE_Y / 2) - hoverCardTotalHeight - 10;
     // Ensure it doesn't go off the top
     if (finalY - scrollY < 10) {
       finalY = scrollY + 10;
@@ -1730,8 +1736,8 @@ function updateHoverCard(type: HoverType, nodeOrEdge?: kan.KANNode | kan.KANEdge
     let edgeText = `${leftText} → ${rightText}`;
     
     hoverCardSplineChart = new SplineChart(splineContainer, {
-      width: 300,
-      height: 300,
+      width: HOVERCARD_CHART_WIDTH,
+      height: HOVERCARD_CHART_HEIGHT,
       title: edgeText,
       showControlPoints: true,
       showOldControlPaths: false,
