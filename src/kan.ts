@@ -48,7 +48,7 @@ export class LearnableFunction {
   knotVector: number[] = [];
   gridSize: number;
   degree: number;
-  initNoise: number | "lecun" | "glorot" | "linear";
+  initNoise: number | "lecun" | "glorot" | "identity";
   inputRange: [number, number] = [-6, 6];
   private fanIn: number;
   private fanOut: number;
@@ -58,7 +58,7 @@ export class LearnableFunction {
     gridSize: number = 5,
     range: [number, number] = [-6, 6],
     degree: number = 3,
-    initNoise: number | "lecun" | "glorot" | "linear" = 0.3,
+    initNoise: number | "lecun" | "glorot" | "identity" = 0.3,
     fanIn: number = 1,
     fanOut: number = 1
   ) {
@@ -104,21 +104,19 @@ export class LearnableFunction {
 
     const randUniform = (a: number, b: number) => a + (b - a) * Math.random();
 
-    if (this.initNoise === "linear") {
-      // Linear initialization: creates identity function or negative identity function
-      // Uses He-style scaling to determine the scale
-      const safeFanIn = Math.max(1, this.fanIn | 0);
-      const safeFanOut = Math.max(1, this.fanOut | 0);
-      const limit = Math.sqrt(2 / safeFanIn); // He et al. ReLU
+    if (this.initNoise === "identity") {
+      // Identity initialization: creates identity function or negative identity function
+      // Control points range from -6 to +6
+      const limit = 6;
 
       // 50% chance for positive or negative identity
       const isPositive = Math.random() < 0.5;
       for (let i = 0; i < numControlPoints; i++) {
         const t = i / (numControlPoints - 1); // 0 to 1
         if (isPositive) {
-          this.controlPoints.push(-limit + 2 * limit * t); // -limit to +limit (identity)
+          this.controlPoints.push(-limit + 2 * limit * t); // -6 to +6 (identity)
         } else {
-          this.controlPoints.push(limit - 2 * limit * t); // +limit to -limit (negative identity)
+          this.controlPoints.push(limit - 2 * limit * t); // +6 to -6 (negative identity)
         }
       }
       return;
@@ -453,7 +451,7 @@ export class KANEdge {
     dest: KANNode,
     gridSize: number = 5,
     degree: number = 3,
-    initNoise: number | "linear" | "lecun" | "glorot" = 0.3,
+    initNoise: number | "identity" | "lecun" | "glorot" = 0.3,
     fanIn: number = 1,
     fanOut: number = 1
   ) {
@@ -746,7 +744,7 @@ export function buildKANNetwork(
   inputIds: string[],
   gridSize: number = 5,
   degree: number = 3,
-  initNoise: number | "linear" | "lecun" | "glorot" = 0.3
+  initNoise: number | "identity" | "lecun" | "glorot" = 0.3
 ): KANNode[][] {
   const numLayers = networkShape.length;
   let nodeId = 1;

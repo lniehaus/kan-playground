@@ -123,12 +123,12 @@ limitations under the License.
           <select id="initNoise">
             <option value="lecun">LeCun</option>
             <option value="glorot">Glorot</option>
-            <option value="linear">Linear</option>
-            <option value="0.1">0.1 (Very small)</option>
-            <option value="0.3">0.3 (Default)</option>
-            <option value="0.5">0.5 (Medium)</option>
-            <option value="1.0">1.0 (Large)</option>
-            <option value="2.0">2.0 (Very large)</option>
+            <option value="identity">Identity</option>
+            <option value="0.1">0.1 σ</option>
+            <option value="0.3">0.3 σ</option>
+            <option value="0.5">0.5 σ</option>
+            <option value="1.0">1.0 σ</option>
+            <option value="5.0">5.0 σ</option>
           </select>
         </div>
       </div>
@@ -389,7 +389,7 @@ limitations under the License.
         smoother, simpler functions, which can regularize but may underfit complex patterns.</p>
       <p><b>Initialization:</b> Determines how spline control points are initialized at network creation. "LeCun" and
         "Glorot" use basis-aware initialization schemes that account for B-spline properties and help preserve
-        variance during forward and backward passes. "Linear" creates identity or negative identity functions, starting
+        variance during forward and backward passes. "Identity" creates identity or negative identity functions, starting
         the network close to linear transformations. Numeric values (0.1-2.0) initialize control points with random
         noise of varying magnitudes: smaller values (0.1-0.3) provide gentle perturbations, while larger values
         (1.0-2.0) create more varied initial functions that can help break symmetry but may reduce training

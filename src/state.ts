@@ -134,7 +134,7 @@ export class State {
   networkShape: number[] = [2];
   numControlPoints = 5; // KAN number of control points for spline functions
   degree = 3;   // KAN B-spline degree (1=linear, 3=cubic, etc.)
-  initNoise: number | "lecun" | "glorot" | "linear" = 0.3; // Allow strategies
+  initNoise: number | "lecun" | "glorot" | "identity" = 0.3; // Allow strategies
   x = true;
   y = true;
   xTimesY = false;
@@ -240,7 +240,7 @@ export class State {
     // Init noise can be strategy or number
     const rawInit = (state as any).initNoise;
     if (rawInit === "kaiming" || rawInit === "lecun"
-        || rawInit === "glorot" || rawInit === "linear") {
+        || rawInit === "glorot" || rawInit === "identity") {
       state.initNoise = rawInit;
     } else {
       const n = typeof rawInit === "string" ? parseFloat(rawInit) :
