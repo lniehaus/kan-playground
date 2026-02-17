@@ -814,8 +814,8 @@ export class SplineChart {
           }
           const event: any = d3.event;
           let newY = this.yScale.invert(event.y);
-          // Clamp the value between -10 and 10
-          newY = Math.max(-10, Math.min(10, newY));
+          // Clamp the value between -15 and 15
+          newY = Math.max(-15, Math.min(15, newY));
           d.y = newY;
           
           if (this.currentFunction) {
